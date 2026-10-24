@@ -18,5 +18,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `go/canon/vX.Y.Z`) at one commit, committed public signing pins and
   fingerprint anchors read from the tagged commit, a read-only tag workflow
   that builds the `canon` CLI for five platforms, and crates.io publication
-  in which package verification is compiled only in credential-free CI and the registry
-  token is released only for the verified package's checksum
+  in which package verification is compiled only in credential-free CI and
+  the registry token is released only for the verified package's checksum
