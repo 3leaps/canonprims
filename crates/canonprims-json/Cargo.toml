@@ -1,0 +1,28 @@
+[package]
+name = "canonprims-json"
+description = "Canonical serialization for structured data (RFC 8785 and successors): the RFC 8785 JSON scheme over a strict I-JSON loader"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation = "https://docs.rs/canonprims-json"
+readme = "README.md"
+keywords = ["canonicalization", "rfc8785", "jcs", "json"]
+categories = ["encoding", "parser-implementations"]
+publish = true
+
+[dependencies]
+canonprims-core.workspace = true
+ryu-js.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[[example]]
+name = "canon-diff"
+
+[lints]
+workspace = true

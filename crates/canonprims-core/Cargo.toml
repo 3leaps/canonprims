@@ -1,0 +1,22 @@
+[package]
+name = "canonprims-core"
+description = "Canonical serialization for structured data (RFC 8785 and successors): schemes, refusals, limits, digests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation = "https://docs.rs/canonprims-core"
+readme = "README.md"
+keywords = ["canonicalization", "rfc8785", "jcs", "digest"]
+categories = ["encoding"]
+publish = true
+
+[dependencies]
+thiserror.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

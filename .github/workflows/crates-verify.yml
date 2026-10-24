@@ -1,0 +1,89 @@
+# canonprims crate package verification after a predecessor is published
+#
+# Dispatched by the maintainer with --ref vX.Y.Z once every earlier crate in
+# config/release/publishable-crates.txt is on crates.io, so the crate packages
+# exactly as consumers will resolve it. Verifies both release tags and the
+# release source like the tag workflow, then builds and verifies the package
+# (cargo package compiles it) and keeps the archive and its digest record as
+# a workflow artifact. Read-only: no credentials, no publication.
+
+name: Crate verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: Crate to verify (a later entry of config/release/publishable-crates.txt)
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: 1.88.0
+
+jobs:
+  verify:
+    name: Verify tags and the crate package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the pinned checker
+        run: |
+          set -euo pipefail
+          scripts/ci-install-pyyaml.sh python3 --user
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
+          name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"
+          version="${name#decernor_}"
+          version="${version%%_*}"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+            "https://github.com/3leaps/decernor/releases/download/v${version}/${name}" \
+            --output "$tool_dir/$name"
+          (cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")
+          tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
+          echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
+
+      - name: Restore both annotated tags and verify them against the committed pin
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "dispatch with --ref vX.Y.Z" >&2; exit 1; }
+          ./scripts/release-restore-tag-ref.sh
+          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
+          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
+          source scripts/release-decernor.sh
+          resolve_release_decernor
+          export RELEASE_DECERNOR_BIN
+          ./scripts/release-validate-pin.sh
+          ./scripts/verify-pinned-tag.sh
+          python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Verify the crate's package (credential-free)
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CRATE: ${{ inputs.crate }}
+        run: scripts/ci-crate-verify.sh "$CRATE" "$RUNNER_TEMP/crate-verification"
+
+      - name: Upload the verified package and its record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: crate-${{ inputs.crate }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/crate-verification/

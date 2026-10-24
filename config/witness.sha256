@@ -1,0 +1,7 @@
+# Independent corpus witnesses, pinned by commit and content.
+# Fetched by scripts/corpus-witness.sh; a mismatch or a failed fetch fails
+# the gate.
+#
+# RFC 8785 checker from https://github.com/3leaps/crucible
+# commit 16e6abcb1ee498da60e98f0712a29087ba55bbee, scripts/rfc8785-canonicalize.py (tag v0.2.1)
+b3121736b69544c354164041818f007727e32326bbc6d01180dd8a907e044807  rfc8785-canonicalize.py

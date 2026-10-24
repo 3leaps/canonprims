@@ -1,0 +1,1318 @@
+{
+  "corpus": "canonical-json/v0",
+  "scheme": "jcs/rfc8785",
+  "default_limits": {
+    "max_bytes": 16777216,
+    "max_depth": 128,
+    "max_object_members": 1048576,
+    "max_string_bytes": 16777216
+  },
+  "cases": [
+    {
+      "id": "rfc8785-3.2.2-example",
+      "input": "cases/rfc8785-3.2.2-example.in",
+      "expect": "ok",
+      "output": "cases/rfc8785-3.2.2-example.out",
+      "digest": "sha256:2d5e01a318d0f0879ab568c4be289c8b1f64ef8921a53c6277d5e069978baacb",
+      "note": "RFC 8785 section 3.2.2 input and output"
+    },
+    {
+      "id": "rfc8785-3.2.3-sorting",
+      "input": "cases/rfc8785-3.2.3-sorting.in",
+      "expect": "ok",
+      "output": "cases/rfc8785-3.2.3-sorting.out",
+      "digest": "sha256:5e321556d22018a9656991a9e94f77ec175fa193e52a2429d312f8419ec8b08c",
+      "note": "RFC 8785 section 3.2.3 sorting example"
+    },
+    {
+      "id": "rfc8785-appendix-b-numbers",
+      "input": "cases/rfc8785-appendix-b-numbers.in",
+      "expect": "ok",
+      "output": "cases/rfc8785-appendix-b-numbers.out",
+      "digest": "sha256:2bb871d729d2db80eda1ae2b3e7a9bc5028979103235ab3682063191b3cb52c3",
+      "note": "RFC 8785 Appendix B values, written with exponents where the RFC's decimal is not the exact value"
+    },
+    {
+      "id": "ws-object",
+      "input": "cases/ws-object.in",
+      "expect": "ok",
+      "output": "cases/ws-object.out",
+      "digest": "sha256:689a8f1db95402580476e38c264278ce7b1e664320cfb4e9ae8d3a908cf09964",
+      "note": "whitespace removed, members sorted"
+    },
+    {
+      "id": "ws-all-kinds",
+      "input": "cases/ws-all-kinds.in",
+      "expect": "ok",
+      "output": "cases/ws-all-kinds.out",
+      "digest": "sha256:49a64717d5d4cb19952e6eac2946415cf6879adacf9908e7d872332d32c6e684",
+      "note": "all four JSON whitespace bytes, inside and around"
+    },
+    {
+      "id": "empty-object",
+      "input": "cases/empty-object.in",
+      "expect": "ok",
+      "output": "cases/empty-object.out",
+      "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "note": "empty object"
+    },
+    {
+      "id": "empty-array",
+      "input": "cases/empty-array.in",
+      "expect": "ok",
+      "output": "cases/empty-array.out",
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "note": "empty array"
+    },
+    {
+      "id": "empty-containers-ws",
+      "input": "cases/empty-containers-ws.in",
+      "expect": "ok",
+      "output": "cases/empty-containers-ws.out",
+      "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "note": "whitespace inside an empty object"
+    },
+    {
+      "id": "empty-array-ws",
+      "input": "cases/empty-array-ws.in",
+      "expect": "ok",
+      "output": "cases/empty-array-ws.out",
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "note": "whitespace inside an empty array"
+    },
+    {
+      "id": "top-null",
+      "input": "cases/top-null.in",
+      "expect": "ok",
+      "output": "cases/top-null.out",
+      "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "note": "top-level literal"
+    },
+    {
+      "id": "top-true",
+      "input": "cases/top-true.in",
+      "expect": "ok",
+      "output": "cases/top-true.out",
+      "digest": "sha256:b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "note": "top-level literal with whitespace"
+    },
+    {
+      "id": "top-false",
+      "input": "cases/top-false.in",
+      "expect": "ok",
+      "output": "cases/top-false.out",
+      "digest": "sha256:fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "note": "top-level literal"
+    },
+    {
+      "id": "top-string",
+      "input": "cases/top-string.in",
+      "expect": "ok",
+      "output": "cases/top-string.out",
+      "digest": "sha256:ac8d8342bbb2362d13f0a559a3621bb407011368895164b628a54f7fc33fc43c",
+      "note": "top-level string"
+    },
+    {
+      "id": "top-zero",
+      "input": "cases/top-zero.in",
+      "expect": "ok",
+      "output": "cases/top-zero.out",
+      "digest": "sha256:5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "note": "top-level number"
+    },
+    {
+      "id": "nested-sort",
+      "input": "cases/nested-sort.in",
+      "expect": "ok",
+      "output": "cases/nested-sort.out",
+      "digest": "sha256:56893cc09eb0fdeb4d72015d49c649dd06ae6e8dbfc66fb8d37bb84b7a718599",
+      "note": "every object level is sorted"
+    },
+    {
+      "id": "array-order",
+      "input": "cases/array-order.in",
+      "expect": "ok",
+      "output": "cases/array-order.out",
+      "digest": "sha256:51bda7ab4e44726cde71fcb6e4b515357059bb6b6dd5146d1fc50f73f11678c6",
+      "note": "arrays keep their order"
+    },
+    {
+      "id": "same-name-different-objects",
+      "input": "cases/same-name-different-objects.in",
+      "expect": "ok",
+      "output": "cases/same-name-different-objects.out",
+      "digest": "sha256:1694e2d3e620d6edc52ba068b1509c8a3aa64b99c71b6c8337f85c64025439bb",
+      "note": "a name may repeat across objects"
+    },
+    {
+      "id": "empty-input",
+      "input": "cases/empty-input.in",
+      "expect": "invalid_json",
+      "note": "no JSON text"
+    },
+    {
+      "id": "whitespace-only",
+      "input": "cases/whitespace-only.in",
+      "expect": "invalid_json",
+      "note": "no JSON text"
+    },
+    {
+      "id": "trailing-value",
+      "input": "cases/trailing-value.in",
+      "expect": "invalid_json",
+      "note": "two top-level values"
+    },
+    {
+      "id": "trailing-garbage",
+      "input": "cases/trailing-garbage.in",
+      "expect": "invalid_json",
+      "note": "content after the value"
+    },
+    {
+      "id": "trailing-number",
+      "input": "cases/trailing-number.in",
+      "expect": "invalid_json",
+      "note": "two numbers"
+    },
+    {
+      "id": "trailing-comma-array",
+      "input": "cases/trailing-comma-array.in",
+      "expect": "invalid_json",
+      "note": "trailing comma"
+    },
+    {
+      "id": "trailing-comma-object",
+      "input": "cases/trailing-comma-object.in",
+      "expect": "invalid_json",
+      "note": "trailing comma"
+    },
+    {
+      "id": "leading-comma",
+      "input": "cases/leading-comma.in",
+      "expect": "invalid_json",
+      "note": "leading comma"
+    },
+    {
+      "id": "missing-colon",
+      "input": "cases/missing-colon.in",
+      "expect": "invalid_json",
+      "note": "missing colon"
+    },
+    {
+      "id": "non-string-name",
+      "input": "cases/non-string-name.in",
+      "expect": "invalid_json",
+      "note": "member name must be a string"
+    },
+    {
+      "id": "single-quotes",
+      "input": "cases/single-quotes.in",
+      "expect": "invalid_json",
+      "note": "single-quoted string"
+    },
+    {
+      "id": "comment",
+      "input": "cases/comment.in",
+      "expect": "invalid_json",
+      "note": "comments are not JSON"
+    },
+    {
+      "id": "literal-case",
+      "input": "cases/literal-case.in",
+      "expect": "invalid_json",
+      "note": "literals are lowercase"
+    },
+    {
+      "id": "literal-short",
+      "input": "cases/literal-short.in",
+      "expect": "invalid_json",
+      "note": "truncated literal"
+    },
+    {
+      "id": "literal-long",
+      "input": "cases/literal-long.in",
+      "expect": "invalid_json",
+      "note": "content after a literal"
+    },
+    {
+      "id": "unclosed-array",
+      "input": "cases/unclosed-array.in",
+      "expect": "invalid_json",
+      "note": "end of input inside an array"
+    },
+    {
+      "id": "unclosed-object",
+      "input": "cases/unclosed-object.in",
+      "expect": "invalid_json",
+      "note": "end of input inside an object"
+    },
+    {
+      "id": "missing-value",
+      "input": "cases/missing-value.in",
+      "expect": "invalid_json",
+      "note": "member with no value"
+    },
+    {
+      "id": "form-feed-whitespace",
+      "input": "cases/form-feed-whitespace.in",
+      "expect": "invalid_json",
+      "note": "U+000C is not JSON whitespace"
+    },
+    {
+      "id": "nbsp-whitespace",
+      "input": "cases/nbsp-whitespace.in",
+      "expect": "invalid_json",
+      "note": "U+00A0 is not JSON whitespace"
+    },
+    {
+      "id": "bom",
+      "input": "cases/bom.in",
+      "expect": "invalid_json",
+      "note": "a byte-order mark is refused"
+    },
+    {
+      "id": "num-spellings",
+      "input": "cases/num-spellings.in",
+      "expect": "ok",
+      "output": "cases/num-spellings.out",
+      "digest": "sha256:1e36c1cde8947f71c86a707beb21727c571b151cc20633674536da76ece39a11",
+      "note": "equivalent spellings collapse"
+    },
+    {
+      "id": "num-thresholds",
+      "input": "cases/num-thresholds.in",
+      "expect": "ok",
+      "output": "cases/num-thresholds.out",
+      "digest": "sha256:b9cd9aaf316ad9b5c479abbee746315a12de7fb278e5d6cd7000653bf9ee312c",
+      "note": "the 1e21 and 1e-6 notation thresholds"
+    },
+    {
+      "id": "num-subnormal-underflow",
+      "input": "cases/num-subnormal-underflow.in",
+      "expect": "ok",
+      "output": "cases/num-subnormal-underflow.out",
+      "digest": "sha256:c5b19f24481cfdb305bea48607985e62dc22c77988d616345138360d86dd0922",
+      "note": "subnormals, underflow to zero, and the round-half-even boundary at the smallest subnormal"
+    },
+    {
+      "id": "num-max",
+      "input": "cases/num-max.in",
+      "expect": "ok",
+      "output": "cases/num-max.out",
+      "digest": "sha256:5f3591f12a80bc6f4b84bc0accbc6f5e037bd9fb1b2ea2f76328b3d9321545b1",
+      "note": "largest finite binary64 and a spelling that rounds to it"
+    },
+    {
+      "id": "num-precision-loss",
+      "input": "cases/num-precision-loss.in",
+      "expect": "ok",
+      "output": "cases/num-precision-loss.out",
+      "digest": "sha256:495e0e07a596ee7353a9538cf96de1fb6f33c5ea8842f08b7cedaaa5c2901790",
+      "note": "fraction tokens round to nearest, ties to even; not a refusal"
+    },
+    {
+      "id": "int-negative-zero",
+      "input": "cases/int-negative-zero.in",
+      "expect": "ok",
+      "output": "cases/int-negative-zero.out",
+      "digest": "sha256:5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "note": "negative zero integer token"
+    },
+    {
+      "id": "int-small",
+      "input": "cases/int-small.in",
+      "expect": "ok",
+      "output": "cases/int-small.out",
+      "digest": "sha256:19a9b344c72d9c0fa49379df72083c40b40bad33139fe0c881745b4bfbfc4c67",
+      "note": "small integers"
+    },
+    {
+      "id": "int-2p53",
+      "input": "cases/int-2p53.in",
+      "expect": "ok",
+      "output": "cases/int-2p53.out",
+      "digest": "sha256:c681da39d7273a6a24c15c9cac3a75526ff2ecf8ba4ee60346a0c70c8163bdb2",
+      "note": "2^53 is exact"
+    },
+    {
+      "id": "int-neg-2p53-plus-2",
+      "input": "cases/int-neg-2p53-plus-2.in",
+      "expect": "ok",
+      "output": "cases/int-neg-2p53-plus-2.out",
+      "digest": "sha256:8b2b4d20f4a3d433a96af6bee9bcacfde38185a1be30ecc568d66e3db3ad700e",
+      "note": "an even integer above 2^53 is exact"
+    },
+    {
+      "id": "int-2p64",
+      "input": "cases/int-2p64.in",
+      "expect": "ok",
+      "output": "cases/int-2p64.out",
+      "digest": "sha256:edacbbb2252b28815fa8983aad4682ab7718badd58a7e92c6b65b4292f308225",
+      "note": "2^64 is exact; printed per ECMAScript"
+    },
+    {
+      "id": "int-2p68",
+      "input": "cases/int-2p68.in",
+      "expect": "ok",
+      "output": "cases/int-2p68.out",
+      "digest": "sha256:7933ef1b34c194c7a327ef424e54282dd2872bc7bda27812f9edf7882ca340c0",
+      "note": "2^68 written exactly"
+    },
+    {
+      "id": "int-2p128",
+      "input": "cases/int-2p128.in",
+      "expect": "ok",
+      "output": "cases/int-2p128.out",
+      "digest": "sha256:f7039b59919577573bd16b454ab8abeba566b3e46a0b288b46547694debc89b0",
+      "note": "2^128 is exact"
+    },
+    {
+      "id": "int-2p1000",
+      "input": "cases/int-2p1000.in",
+      "expect": "ok",
+      "output": "cases/int-2p1000.out",
+      "digest": "sha256:424d17974a5fcdee3dd182df8f2480ac7a7bd8d8238f9dff369869c0e1a889f8",
+      "note": "2^1000 is exact: no integer width ceiling"
+    },
+    {
+      "id": "int-f64-max",
+      "input": "cases/int-f64-max.in",
+      "expect": "ok",
+      "output": "cases/int-f64-max.out",
+      "digest": "sha256:c2784e1abd6317452708f3fbf9641c16b959561bc621a1d408c23a20aa2cb585",
+      "note": "the largest finite binary64 written as an integer"
+    },
+    {
+      "id": "int-2p53-plus-1",
+      "input": "cases/int-2p53-plus-1.in",
+      "expect": "integer_outside_binary64",
+      "note": "2^53+1 is not a binary64 value"
+    },
+    {
+      "id": "int-u64-max",
+      "input": "cases/int-u64-max.in",
+      "expect": "integer_outside_binary64",
+      "note": "2^64-1 is not a binary64 value"
+    },
+    {
+      "id": "int-i128-max",
+      "input": "cases/int-i128-max.in",
+      "expect": "integer_outside_binary64",
+      "note": "2^127-1 is not a binary64 value; a saturating cast would wrongly admit it"
+    },
+    {
+      "id": "int-2p68-es6-spelling",
+      "input": "cases/int-2p68-es6-spelling.in",
+      "expect": "ok",
+      "output": "cases/int-2p68-es6-spelling.out",
+      "digest": "sha256:7933ef1b34c194c7a327ef424e54282dd2872bc7bda27812f9edf7882ca340c0",
+      "note": "the ES6 spelling of 2^68 is admitted although it is not the exact value"
+    },
+    {
+      "id": "int-2p64-es6-spelling",
+      "input": "cases/int-2p64-es6-spelling.in",
+      "expect": "ok",
+      "output": "cases/int-2p64-es6-spelling.out",
+      "digest": "sha256:edacbbb2252b28815fa8983aad4682ab7718badd58a7e92c6b65b4292f308225",
+      "note": "canonical output for 2^64 is admissible input: canonicalization is idempotent"
+    },
+    {
+      "id": "int-neg-2p64-es6-spelling",
+      "input": "cases/int-neg-2p64-es6-spelling.in",
+      "expect": "ok",
+      "output": "cases/int-neg-2p64-es6-spelling.out",
+      "digest": "sha256:c79b59df9fc9ee55305b70e0abbe683c7f1f332c5aebd78b9c618a0c0d58dd54",
+      "note": "negative ES6 spelling"
+    },
+    {
+      "id": "int-i64-min-es6-spelling",
+      "input": "cases/int-i64-min-es6-spelling.in",
+      "expect": "ok",
+      "output": "cases/int-i64-min-es6-spelling.out",
+      "digest": "sha256:b35244209d87dcfa7df86b5efd09651683c9e38b95053d7562a1b9c25b567469",
+      "note": "ES6 spelling of -2^63"
+    },
+    {
+      "id": "int-2p64-es6-plus-1",
+      "input": "cases/int-2p64-es6-plus-1.in",
+      "expect": "integer_outside_binary64",
+      "note": "neither exact nor the ES6 spelling"
+    },
+    {
+      "id": "int-2p68-es6-plus-1",
+      "input": "cases/int-2p68-es6-plus-1.in",
+      "expect": "integer_outside_binary64",
+      "note": "neither exact nor the ES6 spelling"
+    },
+    {
+      "id": "int-2p64-es6-padded",
+      "input": "cases/int-2p64-es6-padded.in",
+      "expect": "integer_outside_binary64",
+      "note": "not exact, and ES6 writes 1.8446744073709552e+22"
+    },
+    {
+      "id": "int-9p0072e18-es6-spelling",
+      "input": "cases/int-9p0072e18-es6-spelling.in",
+      "expect": "ok",
+      "output": "cases/int-9p0072e18-es6-spelling.out",
+      "digest": "sha256:be898087507815cd11b1227b23b76cb442e401b1acbf40f991766e1c5d3c37ed",
+      "note": "not exact, but byte-identical to the ES6 spelling of its nearest binary64"
+    },
+    {
+      "id": "int-es6-off-by-one-digit",
+      "input": "cases/int-es6-off-by-one-digit.in",
+      "expect": "integer_outside_binary64",
+      "note": "one digit away from an ES6 spelling"
+    },
+    {
+      "id": "int-2p1000-plus-digit",
+      "input": "cases/int-2p1000-plus-digit.in",
+      "expect": "integer_outside_binary64",
+      "note": "near 2^1000 but not exact"
+    },
+    {
+      "id": "int-f64-max-plus-1",
+      "input": "cases/int-f64-max-plus-1.in",
+      "expect": "integer_outside_binary64",
+      "note": "one more than the largest finite binary64"
+    },
+    {
+      "id": "int-400-nines",
+      "input": "cases/int-400-nines.in",
+      "expect": "integer_outside_binary64",
+      "note": "beyond binary64 range: an integer token, not non-finite"
+    },
+    {
+      "id": "int-in-array",
+      "input": "cases/int-in-array.in",
+      "expect": "integer_outside_binary64",
+      "note": "inside a container"
+    },
+    {
+      "id": "num-overflow",
+      "input": "cases/num-overflow.in",
+      "expect": "non_finite_number",
+      "note": "rounds to infinity"
+    },
+    {
+      "id": "num-1e400",
+      "input": "cases/num-1e400.in",
+      "expect": "non_finite_number",
+      "note": "exponent overflow"
+    },
+    {
+      "id": "num-neg-1e400",
+      "input": "cases/num-neg-1e400.in",
+      "expect": "non_finite_number",
+      "note": "negative exponent overflow"
+    },
+    {
+      "id": "num-fraction-overflow",
+      "input": "cases/num-fraction-overflow.in",
+      "expect": "non_finite_number",
+      "note": "fraction with exponent overflow"
+    },
+    {
+      "id": "num-grammar-leading-zero",
+      "input": "cases/num-grammar-leading-zero.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 01"
+    },
+    {
+      "id": "num-grammar-neg-leading-zero",
+      "input": "cases/num-grammar-neg-leading-zero.in",
+      "expect": "invalid_json",
+      "note": "number grammar: -01"
+    },
+    {
+      "id": "num-grammar-bare-minus",
+      "input": "cases/num-grammar-bare-minus.in",
+      "expect": "invalid_json",
+      "note": "number grammar: -"
+    },
+    {
+      "id": "num-grammar-dot-end",
+      "input": "cases/num-grammar-dot-end.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 1."
+    },
+    {
+      "id": "num-grammar-exp-end",
+      "input": "cases/num-grammar-exp-end.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 1e"
+    },
+    {
+      "id": "num-grammar-exp-sign-end",
+      "input": "cases/num-grammar-exp-sign-end.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 1e+"
+    },
+    {
+      "id": "num-grammar-dot-exp",
+      "input": "cases/num-grammar-dot-exp.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 1.e5"
+    },
+    {
+      "id": "num-grammar-leading-dot",
+      "input": "cases/num-grammar-leading-dot.in",
+      "expect": "invalid_json",
+      "note": "number grammar: .5"
+    },
+    {
+      "id": "num-grammar-plus",
+      "input": "cases/num-grammar-plus.in",
+      "expect": "invalid_json",
+      "note": "number grammar: +1"
+    },
+    {
+      "id": "num-grammar-hex",
+      "input": "cases/num-grammar-hex.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 0x10"
+    },
+    {
+      "id": "num-grammar-exp-frac",
+      "input": "cases/num-grammar-exp-frac.in",
+      "expect": "invalid_json",
+      "note": "number grammar: 1.5e"
+    },
+    {
+      "id": "num-grammar-nan",
+      "input": "cases/num-grammar-nan.in",
+      "expect": "invalid_json",
+      "note": "number grammar: NaN"
+    },
+    {
+      "id": "num-grammar-infinity",
+      "input": "cases/num-grammar-infinity.in",
+      "expect": "invalid_json",
+      "note": "number grammar: Infinity"
+    },
+    {
+      "id": "num-grammar-neg-infinity",
+      "input": "cases/num-grammar-neg-infinity.in",
+      "expect": "invalid_json",
+      "note": "number grammar: -Infinity"
+    },
+    {
+      "id": "str-short-escapes",
+      "input": "cases/str-short-escapes.in",
+      "expect": "ok",
+      "output": "cases/str-short-escapes.out",
+      "digest": "sha256:11b17be1c38ac0f40c1c36cb58861f9853f04d6702d8edf4c79e6aca6216c346",
+      "note": "two-character escapes; \\/ becomes /"
+    },
+    {
+      "id": "str-all-controls",
+      "input": "cases/str-all-controls.in",
+      "expect": "ok",
+      "output": "cases/str-all-controls.out",
+      "digest": "sha256:f144bcffbdbaea0a670956fb0a3edd44ce6bc4dedc77c30cfc14f40034044739",
+      "note": "every control character, lowercase hex"
+    },
+    {
+      "id": "str-controls-upper-hex",
+      "input": "cases/str-controls-upper-hex.in",
+      "expect": "ok",
+      "output": "cases/str-controls-upper-hex.out",
+      "digest": "sha256:43be7c0e9093a966f13a69e7db72369ff6e527e1031086d7a0c1aa03bef0f943",
+      "note": "uppercase hex input, lowercase output"
+    },
+    {
+      "id": "str-del-and-separators",
+      "input": "cases/str-del-and-separators.in",
+      "expect": "ok",
+      "output": "cases/str-del-and-separators.out",
+      "digest": "sha256:95df0b63167be5cce73c768a4dd6b0005aa196870fdc24ca85e0a03c1dd7a6c0",
+      "note": "U+007F, U+2028 and U+2029 are emitted as themselves"
+    },
+    {
+      "id": "str-latin",
+      "input": "cases/str-latin.in",
+      "expect": "ok",
+      "output": "cases/str-latin.out",
+      "digest": "sha256:d750db8fb580691faf4d590786b722210145aa8aefaf5f11fd033c48a7212bd4",
+      "note": "escaped and raw forms are equal"
+    },
+    {
+      "id": "str-surrogate-pair",
+      "input": "cases/str-surrogate-pair.in",
+      "expect": "ok",
+      "output": "cases/str-surrogate-pair.out",
+      "digest": "sha256:670b25e50032f04315892aa44b4128eb99c6eae4db83315554756b82b28d735e",
+      "note": "escaped surrogate pair"
+    },
+    {
+      "id": "str-raw-astral",
+      "input": "cases/str-raw-astral.in",
+      "expect": "ok",
+      "output": "cases/str-raw-astral.out",
+      "digest": "sha256:0c94c94cb9163c7dce7fcca04e24bca83905fbfad191de7193e472480302152d",
+      "note": "raw UTF-8 outside the BMP"
+    },
+    {
+      "id": "nonchar-escaped-ffff",
+      "input": "cases/nonchar-escaped-ffff.in",
+      "expect": "noncharacter",
+      "note": "U+FFFF escaped"
+    },
+    {
+      "id": "nonchar-escaped-fffe",
+      "input": "cases/nonchar-escaped-fffe.in",
+      "expect": "noncharacter",
+      "note": "U+FFFE escaped, uppercase hex"
+    },
+    {
+      "id": "nonchar-escaped-fdd0",
+      "input": "cases/nonchar-escaped-fdd0.in",
+      "expect": "noncharacter",
+      "note": "first of the U+FDD0 block"
+    },
+    {
+      "id": "nonchar-escaped-fdef",
+      "input": "cases/nonchar-escaped-fdef.in",
+      "expect": "noncharacter",
+      "note": "last of the U+FDD0 block"
+    },
+    {
+      "id": "nonchar-raw-ffff",
+      "input": "cases/nonchar-raw-ffff.in",
+      "expect": "noncharacter",
+      "note": "U+FFFF as raw UTF-8"
+    },
+    {
+      "id": "nonchar-raw-fdd5",
+      "input": "cases/nonchar-raw-fdd5.in",
+      "expect": "noncharacter",
+      "note": "raw, mid-string"
+    },
+    {
+      "id": "nonchar-pair-1fffe",
+      "input": "cases/nonchar-pair-1fffe.in",
+      "expect": "noncharacter",
+      "note": "U+1FFFE as an escaped surrogate pair"
+    },
+    {
+      "id": "nonchar-raw-10ffff",
+      "input": "cases/nonchar-raw-10ffff.in",
+      "expect": "noncharacter",
+      "note": "U+10FFFF, the last code point, as raw UTF-8"
+    },
+    {
+      "id": "nonchar-pair-10ffff",
+      "input": "cases/nonchar-pair-10ffff.in",
+      "expect": "noncharacter",
+      "note": "U+10FFFF as an escaped surrogate pair"
+    },
+    {
+      "id": "nonchar-in-name",
+      "input": "cases/nonchar-in-name.in",
+      "expect": "noncharacter",
+      "note": "member names are strings too"
+    },
+    {
+      "id": "nonchar-before-dup",
+      "input": "cases/nonchar-before-dup.in",
+      "expect": "noncharacter",
+      "note": "first defect reached wins"
+    },
+    {
+      "id": "dup-before-nonchar",
+      "input": "cases/dup-before-nonchar.in",
+      "expect": "duplicate_member",
+      "note": "first defect reached wins"
+    },
+    {
+      "id": "lone-before-nonchar",
+      "input": "cases/lone-before-nonchar.in",
+      "expect": "lone_surrogate",
+      "note": "a high surrogate followed by a non-low escape"
+    },
+    {
+      "id": "nonchar-neighbours",
+      "input": "cases/nonchar-neighbours.in",
+      "expect": "ok",
+      "output": "cases/nonchar-neighbours.out",
+      "digest": "sha256:3d1a05e417af547c0cd78697f210e06b8476a75957981e15882d02815fc6151e",
+      "note": "the code points next to noncharacters are fine"
+    },
+    {
+      "id": "str-nul-mid",
+      "input": "cases/str-nul-mid.in",
+      "expect": "ok",
+      "output": "cases/str-nul-mid.out",
+      "digest": "sha256:9db18af7360cd5d03bddf6a34395bcbe2a9a0c79ef7c495e5bd149c3c490defe",
+      "note": "NUL inside a string"
+    },
+    {
+      "id": "str-empty",
+      "input": "cases/str-empty.in",
+      "expect": "ok",
+      "output": "cases/str-empty.out",
+      "digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "note": "empty string"
+    },
+    {
+      "id": "str-raw-del",
+      "input": "cases/str-raw-del.in",
+      "expect": "ok",
+      "output": "cases/str-raw-del.out",
+      "digest": "sha256:6fe76740e12a93d5598fe685cb6ad3d3c94e44609065a56866b69647772026ec",
+      "note": "raw DEL is not a control character in JSON"
+    },
+    {
+      "id": "str-raw-control",
+      "input": "cases/str-raw-control.in",
+      "expect": "invalid_json",
+      "note": "raw control byte inside a string"
+    },
+    {
+      "id": "str-raw-tab",
+      "input": "cases/str-raw-tab.in",
+      "expect": "invalid_json",
+      "note": "raw tab inside a string"
+    },
+    {
+      "id": "str-raw-newline",
+      "input": "cases/str-raw-newline.in",
+      "expect": "invalid_json",
+      "note": "raw newline inside a string"
+    },
+    {
+      "id": "str-bad-escape",
+      "input": "cases/str-bad-escape.in",
+      "expect": "invalid_json",
+      "note": "unknown escape"
+    },
+    {
+      "id": "str-escape-apostrophe",
+      "input": "cases/str-escape-apostrophe.in",
+      "expect": "invalid_json",
+      "note": "\\' is not a JSON escape"
+    },
+    {
+      "id": "str-short-unicode",
+      "input": "cases/str-short-unicode.in",
+      "expect": "invalid_json",
+      "note": "fewer than four hex digits"
+    },
+    {
+      "id": "str-bad-hex",
+      "input": "cases/str-bad-hex.in",
+      "expect": "invalid_json",
+      "note": "non-hex digit"
+    },
+    {
+      "id": "str-capital-u",
+      "input": "cases/str-capital-u.in",
+      "expect": "invalid_json",
+      "note": "\\U is not an escape"
+    },
+    {
+      "id": "str-unterminated",
+      "input": "cases/str-unterminated.in",
+      "expect": "invalid_json",
+      "note": "end of input inside a string"
+    },
+    {
+      "id": "str-unterminated-escape",
+      "input": "cases/str-unterminated-escape.in",
+      "expect": "invalid_json",
+      "note": "end of input after a backslash"
+    },
+    {
+      "id": "surrogate-lone-high",
+      "input": "cases/surrogate-lone-high.in",
+      "expect": "lone_surrogate",
+      "note": "high surrogate then quote"
+    },
+    {
+      "id": "surrogate-lone-low",
+      "input": "cases/surrogate-lone-low.in",
+      "expect": "lone_surrogate",
+      "note": "low surrogate first"
+    },
+    {
+      "id": "surrogate-high-then-char",
+      "input": "cases/surrogate-high-then-char.in",
+      "expect": "lone_surrogate",
+      "note": "high surrogate then a character"
+    },
+    {
+      "id": "surrogate-high-then-other-escape",
+      "input": "cases/surrogate-high-then-other-escape.in",
+      "expect": "lone_surrogate",
+      "note": "high surrogate then a non-\\u escape"
+    },
+    {
+      "id": "surrogate-high-high",
+      "input": "cases/surrogate-high-high.in",
+      "expect": "lone_surrogate",
+      "note": "two high surrogates"
+    },
+    {
+      "id": "surrogate-low-high",
+      "input": "cases/surrogate-low-high.in",
+      "expect": "lone_surrogate",
+      "note": "reversed pair"
+    },
+    {
+      "id": "surrogate-high-bmp",
+      "input": "cases/surrogate-high-bmp.in",
+      "expect": "lone_surrogate",
+      "note": "high surrogate then a BMP escape"
+    },
+    {
+      "id": "surrogate-high-end-of-input",
+      "input": "cases/surrogate-high-end-of-input.in",
+      "expect": "lone_surrogate",
+      "note": "high surrogate then end of input: the missing \\u is a surrogate defect"
+    },
+    {
+      "id": "surrogate-high-bad-hex",
+      "input": "cases/surrogate-high-bad-hex.in",
+      "expect": "invalid_json",
+      "note": "after \\u the hex digits must be valid before the pair is judged"
+    },
+    {
+      "id": "surrogate-in-name",
+      "input": "cases/surrogate-in-name.in",
+      "expect": "lone_surrogate",
+      "note": "lone surrogate in a member name"
+    },
+    {
+      "id": "utf8-overlong",
+      "input": "cases/utf8-overlong.in",
+      "expect": "invalid_utf8",
+      "note": "overlong encoding"
+    },
+    {
+      "id": "utf8-encoded-surrogate",
+      "input": "cases/utf8-encoded-surrogate.in",
+      "expect": "invalid_utf8",
+      "note": "UTF-8 encoded surrogate"
+    },
+    {
+      "id": "utf8-above-max",
+      "input": "cases/utf8-above-max.in",
+      "expect": "invalid_utf8",
+      "note": "above U+10FFFF"
+    },
+    {
+      "id": "utf8-truncated",
+      "input": "cases/utf8-truncated.in",
+      "expect": "invalid_utf8",
+      "note": "truncated sequence"
+    },
+    {
+      "id": "utf8-stray-continuation",
+      "input": "cases/utf8-stray-continuation.in",
+      "expect": "invalid_utf8",
+      "note": "continuation byte with no lead"
+    },
+    {
+      "id": "utf8-ff",
+      "input": "cases/utf8-ff.in",
+      "expect": "invalid_utf8",
+      "note": "0xFF is never UTF-8"
+    },
+    {
+      "id": "utf8-lone-lead",
+      "input": "cases/utf8-lone-lead.in",
+      "expect": "invalid_utf8",
+      "note": "lead byte at end of input"
+    },
+    {
+      "id": "utf8-precedes-grammar",
+      "input": "cases/utf8-precedes-grammar.in",
+      "expect": "invalid_utf8",
+      "note": "encoding is judged before grammar"
+    },
+    {
+      "id": "utf8-precedes-duplicate",
+      "input": "cases/utf8-precedes-duplicate.in",
+      "expect": "invalid_utf8",
+      "note": "encoding is judged before duplicates"
+    },
+    {
+      "id": "dup-simple",
+      "input": "cases/dup-simple.in",
+      "expect": "duplicate_member",
+      "note": "repeated name"
+    },
+    {
+      "id": "dup-after-unescape",
+      "input": "cases/dup-after-unescape.in",
+      "expect": "duplicate_member",
+      "note": "names compare after unescaping"
+    },
+    {
+      "id": "dup-nested",
+      "input": "cases/dup-nested.in",
+      "expect": "duplicate_member",
+      "note": "inside a nested object"
+    },
+    {
+      "id": "dup-same-value",
+      "input": "cases/dup-same-value.in",
+      "expect": "duplicate_member",
+      "note": "even with an equal value"
+    },
+    {
+      "id": "dup-before-later-defect",
+      "input": "cases/dup-before-later-defect.in",
+      "expect": "duplicate_member",
+      "note": "first defect reached wins"
+    },
+    {
+      "id": "defect-before-dup",
+      "input": "cases/defect-before-dup.in",
+      "expect": "invalid_json",
+      "note": "first defect reached wins"
+    },
+    {
+      "id": "sort-utf16-not-codepoint",
+      "input": "cases/sort-utf16-not-codepoint.in",
+      "expect": "ok",
+      "output": "cases/sort-utf16-not-codepoint.out",
+      "digest": "sha256:2be8040fe3029f9de464f315235716337d3ef13fe83fe32a481281b77a32112c",
+      "note": "U+10000 is D800 DC00 in UTF-16, so it sorts before U+FFFD"
+    },
+    {
+      "id": "sort-astral-vs-private-use",
+      "input": "cases/sort-astral-vs-private-use.in",
+      "expect": "ok",
+      "output": "cases/sort-astral-vs-private-use.out",
+      "digest": "sha256:4045c21a23c8ae8f8d9add81f54bd506bee65885099876fb4afb378b1f2c3516",
+      "note": "U+10000 sorts before U+E000"
+    },
+    {
+      "id": "sort-prefix",
+      "input": "cases/sort-prefix.in",
+      "expect": "ok",
+      "output": "cases/sort-prefix.out",
+      "digest": "sha256:f7c822ad8e8a17f47959dac9f7e1f4368bdd1d91df2bf4775b803230904bb635",
+      "note": "a prefix sorts first; empty name first of all"
+    },
+    {
+      "id": "sort-case",
+      "input": "cases/sort-case.in",
+      "expect": "ok",
+      "output": "cases/sort-case.out",
+      "digest": "sha256:07ef08f01b496e1c02f78ac6ff33df9938cec88da07c3c15b317776325597d79",
+      "note": "uppercase before lowercase"
+    },
+    {
+      "id": "sort-by-decoded-name",
+      "input": "cases/sort-by-decoded-name.in",
+      "expect": "ok",
+      "output": "cases/sort-by-decoded-name.out",
+      "digest": "sha256:d3626ac30a87e6f7a6428233b3c68299976865fa5508e4267c5415c76af7a772",
+      "note": "sorting uses the unescaped name"
+    },
+    {
+      "id": "name-escaped-nul",
+      "input": "cases/name-escaped-nul.in",
+      "expect": "ok",
+      "output": "cases/name-escaped-nul.out",
+      "digest": "sha256:0b9c737694e672c26aa3b75fe408fd6364f6c0de8def7c46d8c04ea565a3a941",
+      "note": "a member name containing NUL: escaped on output, and sorts after its prefix"
+    },
+    {
+      "id": "sort-trailing-supplementary",
+      "input": "cases/sort-trailing-supplementary.in",
+      "expect": "ok",
+      "output": "cases/sort-trailing-supplementary.out",
+      "digest": "sha256:c061139a8e1f8412ce0a41b30bf1a962508d03ce83e4502e4c5822d381d07529",
+      "note": "names differ only in a trailing supplementary code point: the second UTF-16 unit decides"
+    },
+    {
+      "id": "sort-digits",
+      "input": "cases/sort-digits.in",
+      "expect": "ok",
+      "output": "cases/sort-digits.out",
+      "digest": "sha256:38a3fdd6f89c34bb41bdb86e885678938b4aaaa0b743d49f3f509d65bbefa88e",
+      "note": "names are strings, not numbers"
+    },
+    {
+      "id": "defect-before-depth",
+      "input": "cases/defect-before-depth.in",
+      "expect": "invalid_json",
+      "note": "a grammar defect at shallow depth"
+    },
+    {
+      "id": "depth-zero-container",
+      "input": "cases/depth-zero-container.in",
+      "expect": "too_deep",
+      "limits": {
+        "max_depth": 0
+      },
+      "note": "with max_depth 0 any container is refused"
+    },
+    {
+      "id": "depth-zero-scalar",
+      "input": "cases/depth-zero-scalar.in",
+      "expect": "ok",
+      "output": "cases/depth-zero-scalar.out",
+      "digest": "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "limits": {
+        "max_depth": 0
+      },
+      "note": "with max_depth 0 a scalar is fine"
+    },
+    {
+      "id": "depth-one",
+      "input": "cases/depth-one.in",
+      "expect": "ok",
+      "output": "cases/depth-one.out",
+      "digest": "sha256:015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862",
+      "limits": {
+        "max_depth": 1
+      },
+      "note": "outermost container is depth 1"
+    },
+    {
+      "id": "depth-one-nested",
+      "input": "cases/depth-one-nested.in",
+      "expect": "too_deep",
+      "limits": {
+        "max_depth": 1
+      },
+      "note": "the second level exceeds max_depth 1"
+    },
+    {
+      "id": "limit-bytes-exact",
+      "input": "cases/limit-bytes-exact.in",
+      "expect": "ok",
+      "output": "cases/limit-bytes-exact.out",
+      "digest": "sha256:568f15e9fe7bcf0adbe2836f7b2c521ab414bcb65c1224ee0feda777965886f7",
+      "limits": {
+        "max_bytes": 4
+      },
+      "note": "input exactly max_bytes long"
+    },
+    {
+      "id": "limit-bytes-over",
+      "input": "cases/limit-bytes-over.in",
+      "expect": "too_large",
+      "limits": {
+        "max_bytes": 4
+      },
+      "note": "input one byte over max_bytes"
+    },
+    {
+      "id": "limit-bytes-before-utf8",
+      "input": "cases/limit-bytes-before-utf8.in",
+      "expect": "too_large",
+      "limits": {
+        "max_bytes": 2
+      },
+      "note": "size is judged before encoding"
+    },
+    {
+      "id": "limit-string-exact",
+      "input": "cases/limit-string-exact.in",
+      "expect": "ok",
+      "output": "cases/limit-string-exact.out",
+      "digest": "sha256:6cc43f858fbb763301637b5af970e2a46b46f461f27e5a0f41e009c59b827b25",
+      "limits": {
+        "max_string_bytes": 3
+      },
+      "note": "string exactly max_string_bytes"
+    },
+    {
+      "id": "limit-string-over",
+      "input": "cases/limit-string-over.in",
+      "expect": "too_large",
+      "limits": {
+        "max_string_bytes": 3
+      },
+      "note": "string over max_string_bytes"
+    },
+    {
+      "id": "limit-string-decoded",
+      "input": "cases/limit-string-decoded.in",
+      "expect": "too_large",
+      "limits": {
+        "max_string_bytes": 3
+      },
+      "note": "measured in decoded UTF-8 bytes (4)"
+    },
+    {
+      "id": "limit-string-escaped-fits",
+      "input": "cases/limit-string-escaped-fits.in",
+      "expect": "ok",
+      "output": "cases/limit-string-escaped-fits.out",
+      "digest": "sha256:0fd3038f8a66ebe544c0baa03845283d0135330c78547e0e7a5bfdc94b52b51d",
+      "limits": {
+        "max_string_bytes": 3
+      },
+      "note": "18 input bytes, 3 decoded bytes"
+    },
+    {
+      "id": "limit-string-name",
+      "input": "cases/limit-string-name.in",
+      "expect": "too_large",
+      "limits": {
+        "max_string_bytes": 3
+      },
+      "note": "member names are strings too"
+    },
+    {
+      "id": "limit-members-exact",
+      "input": "cases/limit-members-exact.in",
+      "expect": "ok",
+      "output": "cases/limit-members-exact.out",
+      "digest": "sha256:43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+      "limits": {
+        "max_object_members": 2
+      },
+      "note": "exactly max_object_members"
+    },
+    {
+      "id": "limit-members-over",
+      "input": "cases/limit-members-over.in",
+      "expect": "too_large",
+      "limits": {
+        "max_object_members": 2
+      },
+      "note": "one member over"
+    },
+    {
+      "id": "limit-members-before-dup",
+      "input": "cases/limit-members-before-dup.in",
+      "expect": "too_large",
+      "limits": {
+        "max_object_members": 2
+      },
+      "note": "the member count is judged before the name"
+    },
+    {
+      "id": "limit-members-after-quote",
+      "input": "cases/limit-members-after-quote.in",
+      "expect": "invalid_json",
+      "limits": {
+        "max_object_members": 2
+      },
+      "note": "the opening quote is judged before the count"
+    },
+    {
+      "id": "limit-members-zero-empty",
+      "input": "cases/limit-members-zero-empty.in",
+      "expect": "ok",
+      "output": "cases/limit-members-zero-empty.out",
+      "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "limits": {
+        "max_object_members": 0
+      },
+      "note": "an empty object has no members"
+    },
+    {
+      "id": "limit-members-arrays",
+      "input": "cases/limit-members-arrays.in",
+      "expect": "ok",
+      "output": "cases/limit-members-arrays.out",
+      "digest": "sha256:a615eeaee21de5179de080de8c3052c8da901138406ba71c38c032845f7d54f4",
+      "limits": {
+        "max_object_members": 0
+      },
+      "note": "arrays are not limited by max_object_members"
+    },
+    {
+      "id": "depth-128",
+      "generate": {
+        "prefix": "",
+        "unit": "[",
+        "count": 128,
+        "suffix": "]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      },
+      "expect": "ok",
+      "output": "=input",
+      "digest": "sha256:dbaec29ce2fb52a1a372e1da31b0d434d257fe11bebee2d31c6649710e3052a6",
+      "note": "exactly the default depth limit"
+    },
+    {
+      "id": "depth-129",
+      "generate": {
+        "prefix": "",
+        "unit": "[",
+        "count": 129,
+        "suffix": "]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      },
+      "expect": "too_deep",
+      "note": "one beyond the default depth limit"
+    },
+    {
+      "id": "depth-mixed-128",
+      "generate": {
+        "prefix": "",
+        "unit": "[{\"a\":",
+        "count": 64,
+        "suffix": "1}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]"
+      },
+      "expect": "ok",
+      "output": "=input",
+      "digest": "sha256:86cea01d0826ed9bddc260526558ee7c078a94823791518c4704f1528ba752a6",
+      "note": "arrays and objects both count"
+    },
+    {
+      "id": "depth-mixed-130",
+      "generate": {
+        "prefix": "",
+        "unit": "[{\"a\":",
+        "count": 65,
+        "suffix": "1}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]"
+      },
+      "expect": "too_deep",
+      "note": "arrays and objects both count"
+    },
+    {
+      "id": "depth-bomb",
+      "generate": {
+        "prefix": "",
+        "unit": "[",
+        "count": 1000000,
+        "suffix": ""
+      },
+      "expect": "too_deep",
+      "note": "a million unclosed brackets: refused without recursion"
+    },
+    {
+      "id": "depth-before-later-defect",
+      "generate": {
+        "prefix": "",
+        "unit": "[",
+        "count": 129,
+        "suffix": "x"
+      },
+      "expect": "too_deep",
+      "note": "the depth defect is reached first"
+    },
+    {
+      "id": "huge-string-over-default",
+      "generate": {
+        "prefix": "\"",
+        "unit": "a",
+        "count": 104857600,
+        "suffix": "\""
+      },
+      "expect": "too_large",
+      "note": "a 100 MiB string exceeds the default max_bytes"
+    },
+    {
+      "id": "large-string-within-default",
+      "generate": {
+        "prefix": "\"",
+        "unit": "\u00e9",
+        "count": 4194304,
+        "suffix": "\""
+      },
+      "expect": "ok",
+      "output": "=input",
+      "digest": "sha256:990d298e97dad33cab203848e6ad8265029b34d29aabb0309168fad3872407ca",
+      "note": "an 8 MiB string within the defaults"
+    }
+  ]
+}

@@ -1,0 +1,205 @@
+# canonprims CI
+#
+# Every cell runs the full gate, `make check`, natively on the workspace MSRV
+# toolchain (which is also the MSRV verification), through the local
+# composite action .github/actions/make-check. `make check` includes the
+# Rust/Go byte-for-byte agreement (scripts/crosscheck.sh), so a failure in
+# either implementation fails every cell.
+#
+# check (hosted, every push and PR, forks included):
+#   ubuntu-latest            x86_64-unknown-linux-gnu
+#   macos-15                 aarch64-apple-darwin
+#   windows-latest           x86_64-pc-windows-msvc
+# check-arm64 (organization larger runners; same-repo only, so fork PRs skip
+# these cells and they cannot be required checks):
+#   ubuntu-latest-arm64-s    aarch64-unknown-linux-gnu
+#   windows-latest-arm64-s   aarch64-pc-windows-msvc  (x86_64 goneat and
+#                                                      cargo-deny under emulation)
+#
+# Tools are fetched by scripts/ci-install-tools.sh and checked against
+# config/ci-tools.sha256. Third-party actions are pinned by commit.
+# Custom runner labels are declared in .github/actionlint.yaml.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: 1.88.0
+  GO_VERSION: 1.26.10
+  NODE_VERSION: 22.23.4
+
+jobs:
+  check:
+    name: check (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: make check
+        uses: ./.github/actions/make-check
+        with:
+          target: ${{ matrix.target }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          go-version: ${{ env.GO_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
+
+  check-arm64:
+    name: check (${{ matrix.target }})
+    # Same-repo only: fork PRs cannot use organization larger runners.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest-arm64-s
+            target: aarch64-unknown-linux-gnu
+          - runner: windows-latest-arm64-s
+            target: aarch64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: make check
+        uses: ./.github/actions/make-check
+        with:
+          target: ${{ matrix.target }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          go-version: ${{ env.GO_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
+
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint
+        run: |
+          dest="$(scripts/ci-install-tools.sh x86_64-unknown-linux-gnu "${RUNNER_TEMP}/ci-tools" actionlint)"
+          "${dest}/actionlint" -color
+
+  release-tooling:
+    # Synthetic release controls: throwaway keys, local fixtures, mocked remote
+    # state. The checker is the digest-pinned decernor the tag workflow uses.
+    name: release-tooling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install the pinned checker
+        run: |
+          set -euo pipefail
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
+          name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"
+          version="${name#decernor_}"
+          version="${version%%_*}"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+            "https://github.com/3leaps/decernor/releases/download/v${version}/${name}" \
+            --output "$tool_dir/$name"
+          (cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")
+          tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
+          echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
+
+      - name: Install minisign and PyYAML
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          scripts/ci-install-pyyaml.sh python3 --user
+          minisign -v
+
+      - name: Release tooling controls
+        run: make release-tooling-test
+
+      - name: Local crate packaging
+        run: make release-check
+
+  go-standalone:
+    # The Go module must stand alone: copied outside the repository, given
+    # only the corpus, with no skipped tests.
+    name: go-standalone
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: go/canon outside the repository
+        env:
+          GOWORK: "off"
+          CGO_ENABLED: "0"
+        run: |
+          corpus="$PWD/conformance/canonical-json/v0"
+          standalone="$(mktemp -d)/canon"
+          cp -R go/canon "$standalone"
+          cd "$standalone"
+          CANON_CORPUS_DIR="$corpus" go test -count=1 -v ./... | tee "$RUNNER_TEMP/go-standalone.log"
+          if grep -q -- '--- SKIP' "$RUNNER_TEMP/go-standalone.log"; then
+            echo "standalone go/canon tests must not skip" >&2
+            exit 1
+          fi

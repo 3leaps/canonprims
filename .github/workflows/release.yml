@@ -1,0 +1,324 @@
+# canonprims read-only release artifacts
+#
+# On a v* tag: verify both release tags (vX.Y.Z and go/canon/vX.Y.Z) against
+# the public pin committed in the tagged commit, check the committed anchors
+# with the digest-pinned checker, then build the canon CLI on the five native
+# cells and an SBOM, and keep them as workflow artifacts.
+#
+# This workflow holds no signing, release or registry authority. It is defined
+# by the tagged commit, so a green run is a consistency signal, not release
+# authorization. The maintainer verifies the tags independently, creates the
+# draft locally from these artifacts, signs the manifests and publishes.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: 1.88.0
+
+jobs:
+  verify:
+    name: Verify tags and anchors
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      object: ${{ steps.identity.outputs.object }}
+      commit: ${{ steps.identity.outputs.commit }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the pinned checker
+        run: |
+          set -euo pipefail
+          scripts/ci-install-pyyaml.sh python3 --user
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
+          name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"
+          version="${name#decernor_}"
+          version="${version%%_*}"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+            "https://github.com/3leaps/decernor/releases/download/v${version}/${name}" \
+            --output "$tool_dir/$name"
+          (cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")
+          tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
+          echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
+
+      - name: Restore both annotated tags and verify them against the committed pin
+        id: identity
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ./scripts/release-restore-tag-ref.sh
+          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
+          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
+          source scripts/release-decernor.sh
+          resolve_release_decernor
+          export RELEASE_DECERNOR_BIN
+          ./scripts/release-validate-pin.sh
+          ./scripts/verify-pinned-tag.sh
+          # Before any job builds it, the tagged source must be inert for Cargo.
+          python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"
+          version="$(tr -d '\r\n' < VERSION)"
+          object="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG")"
+          commit="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{}")"
+          {
+            echo "version=$version"
+            echo "object=$object"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+          module_object="$(git rev-parse "refs/tags/$module_tag")"
+          printf '{"tag":"%s","object":"%s","module_object":"%s","commit":"%s"}\n' \
+            "$CANONPRIMS_RELEASE_TAG" "$object" "$module_object" "$commit" > release-identity.json
+
+      - name: Upload artifact identity and licenses
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-identity
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            release-identity.json
+            LICENSE-MIT
+            LICENSE-APACHE
+
+  build-cli:
+    name: Build CLI (${{ matrix.artifact_suffix }})
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: linux-amd64
+            archive: tar.gz
+          - runner: ubuntu-latest-arm64-s
+            target: aarch64-unknown-linux-gnu
+            artifact_suffix: linux-arm64
+            archive: tar.gz
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            artifact_suffix: darwin-arm64
+            archive: tar.gz
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            artifact_suffix: windows-amd64
+            archive: zip
+          - runner: windows-latest-arm64-s
+            target: aarch64-pc-windows-msvc
+            artifact_suffix: windows-arm64
+            archive: zip
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Verify native host
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          host=$(rustc -vV | awk '/^host:/{print $2}')
+          test "$host" = "$TARGET"
+
+      - name: Build CLI
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo build --release --locked --target "$TARGET" -p canonprims-cli
+
+      - name: Package CLI
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          SUFFIX: ${{ matrix.artifact_suffix }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/cli
+          cp LICENSE-MIT LICENSE-APACHE dist/cli/
+          if [ "$ARCHIVE" = "zip" ]; then
+            cp "target/$TARGET/release/canon.exe" dist/cli/canon.exe
+            powershell.exe -NoProfile -Command "Compress-Archive -Path dist/cli/* -DestinationPath canon-${VERSION}-${SUFFIX}.zip"
+          else
+            cp "target/$TARGET/release/canon" dist/cli/canon
+            # No AppleDouble (._*) members from the macOS tar.
+            COPYFILE_DISABLE=1 tar -czf "canon-${VERSION}-${SUFFIX}.tar.gz" -C dist/cli .
+          fi
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cli-${{ matrix.artifact_suffix }}
+          if-no-files-found: error
+          retention-days: 30
+          path: canon-${{ needs.verify.outputs.version }}-${{ matrix.artifact_suffix }}.${{ matrix.archive }}
+
+  source:
+    name: Source archive
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Build source archive
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          set -euo pipefail
+          git --version
+          git archive --format=tar.gz --prefix="canonprims-${VERSION}/" -o "canonprims-${VERSION}-src.tar.gz" "$COMMIT"
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source
+          if-no-files-found: error
+          retention-days: 30
+          path: canonprims-${{ needs.verify.outputs.version }}-src.tar.gz
+
+  crate-check:
+    name: Crate package check (canonprims-core)
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          set -euo pipefail
+          ./scripts/release-restore-tag-ref.sh
+          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
+          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Verify the first crate's package (credential-free)
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+        run: scripts/ci-crate-verify.sh canonprims-core "$RUNNER_TEMP/crate-verification"
+
+      - name: Upload the verified package and its record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: crate-canonprims-core
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/crate-verification/
+
+  sbom:
+    name: Generate SBOM
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ghcr.io/fulmenhq/sbom-tools@sha256:954267f9aca809b89af42bb97471a3c4d7b93c385c5625829b244b17b252fbde
+      options: --user 1001
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Generate SBOM (CycloneDX)
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          set -euo pipefail
+          syft dir:. -o cyclonedx-json > sbom-raw.json
+          # Name the lockfile and commit the SBOM was generated from.
+          lock="$(sha256sum Cargo.lock | cut -c1-64)"
+          jq --arg lock "$lock" --arg commit "$COMMIT" \
+            '.metadata.properties = ((.metadata.properties // []) + [{name: "canonprims:cargo-lock-sha256", value: $lock}, {name: "canonprims:source-commit", value: $commit}])' \
+            sbom-raw.json > "sbom-${VERSION}.cdx.json"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          if-no-files-found: error
+          retention-days: 30
+          path: sbom-${{ needs.verify.outputs.version }}.cdx.json

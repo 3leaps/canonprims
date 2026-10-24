@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/canonprims-core",
+    "crates/canonprims-json",
+    "crates/canonprims-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/3leaps/canonprims"
+homepage = "https://github.com/3leaps/canonprims"
+authors = ["3leaps Architecture Council"]
+publish = false
+
+[workspace.dependencies]
+canonprims-core = { version = "0.1.0", path = "crates/canonprims-core" }
+canonprims-json = { version = "0.1.0", path = "crates/canonprims-json" }
+thiserror = "2.0"
+sha2 = "0.10"
+ryu-js = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+proptest = "1.5"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

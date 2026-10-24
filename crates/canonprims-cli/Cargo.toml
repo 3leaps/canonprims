@@ -1,0 +1,23 @@
+[package]
+name = "canonprims-cli"
+description = "Canonical serialization for structured data (RFC 8785 and successors): the canon command"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "canon"
+path = "src/main.rs"
+
+[dependencies]
+canonprims-core.workspace = true
+canonprims-json.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true
