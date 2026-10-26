@@ -1,6 +1,9 @@
 # goneat tools configuration: host tools for development and the release
-# ceremony, with a recommended minimum for each. `make doctor` reports every
-# tool's version against its minimum and fails when one is missing or older.
+# ceremony, with a recommended minimum for each. `make doctor`
+# (scripts/doctor.py) reports every tool's version against its minimum and
+# fails when one is missing, older, or unreadable. It reads each version with
+# the pattern in config/doctor-versions.txt rather than goneat's comparison,
+# which skips two-part versions such as jq-1.6.
 #
 # The minimums are recommendations: the versions this repository is known to
 # work with, not proven lower bounds. Older versions may work; YMMV. Two are

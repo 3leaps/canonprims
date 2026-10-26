@@ -130,7 +130,9 @@ Requirements:
 `.goneat/tools.yaml` declares a recommended minimum version for each host tool
 the checks and the release ceremony run (git, gh, jq, Python, gpg, minisign,
 Go), and `make doctor` reports each one against it (`DOCTOR_SCOPE=dev` for the
-development set). The minimums are the versions this repository is known to
+development set). It fails when a tool is missing, older, or prints a version
+it cannot read; `config/doctor-versions.txt` says how each tool's version is
+read. The minimums are the versions this repository is known to
 work with, not proven lower bounds; older versions may work, YMMV. Two are
 firm: jq 1.6 rejects a jq keyword used as a variable name, and the release
 scripts refuse Python older than 3.11.
