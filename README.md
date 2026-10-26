@@ -23,8 +23,9 @@ written in place and re-sorted only when out of order), so their agreement
 is weaker evidence against a shared parser-design error. The independent
 evidence comes from elsewhere: number serialization is implemented
 differently in each (ryu-based in Rust, `strconv` with an exact `math/big`
-integer check in Go), and the corpus expectations are hand-derived and
-checked against ECMAScript and a separate Python checker.
+integer check in Go), and the corpus expectations are hand-derived, with the
+file-based accept cases also checked against ECMAScript and a separate Python
+checker (see Development).
 
 ### Packages
 
