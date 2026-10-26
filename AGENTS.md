@@ -98,6 +98,6 @@ MIT OR Apache-2.0. All dependencies must stay permissively licensed.
 | `crates/canonprims-core` | Schemes, refusal codes, limits, digests |
 | `crates/canonprims-json` | RFC 8785 over a strict I-JSON loader |
 | `crates/canonprims-cli` | The `canon` command |
-| `go/canon` | Pure-Go twin (standard library only) |
+| `go.mod`, `canon/` | Pure-Go twin (root module, standard library only) |
 | `scripts/crosscheck.sh` | Rust/Go byte-for-byte agreement |
 | `VERSION` | Version SSOT |

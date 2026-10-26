@@ -27,13 +27,13 @@ src="$scratch/source"
 git init -q -b main "$src"
 git -C "$src" config user.name '3 Leaps Infosec Team'
 git -C "$src" config user.email infosec@3leaps.net
-mkdir -p "$src/scripts" "$src/docs/security" "$src/keys" "$src/config/release" "$src/go/canon"
+mkdir -p "$src/scripts" "$src/docs/security" "$src/keys" "$src/config/release"
 verifier=(verify-pinned-tag.sh validate-release-anchors.sh release-verify-published-tag.sh release-tag-common.sh release-gh.sh release-workflow-pin.py
     release-decernor.sh release-insert-anchors.sh install-release-anchors.sh)
 for script in "${verifier[@]}"; do cp "$root/scripts/$script" "$src/scripts/"; done
 cp "$root/config/release/tagger-identity.txt" "$src/config/release/"
 printf '1.2.3\n' >"$src/VERSION"
-printf 'module github.com/3leaps/canonprims/go/canon\n' >"$src/go/canon/go.mod"
+printf 'module github.com/3leaps/canonprims\n' >"$src/go.mod"
 mkdir -p "$src/.github/workflows"
 printf 'on:\n  push:\n    tags: [v*]\npermissions:\n  contents: read\njobs: {}\n' >"$src/.github/workflows/release.yml"
 printf '%s  .github/workflows/release.yml\n' "$(shasum -a 256 "$src/.github/workflows/release.yml" | cut -c1-64)" \
@@ -50,18 +50,16 @@ CANONPRIMS_DECERNOR_BIN="$decernor" "$src/scripts/release-insert-anchors.sh" >/d
 git -C "$src" add -A
 git -C "$src" commit -qm anchors
 commit="$(git -C "$src" rev-parse HEAD)"
-# Both release tags, signed by the committed subkey, at one commit.
+# The release tag, signed by the committed subkey.
 sign_tag() {
-    local target="${2:-HEAD}" tag
+    local target="${2:-HEAD}"
     printf '%s\n' "$1" >"$scratch/msg"
-    for tag in v1.2.3 go/canon/v1.2.3; do
-        GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
-            git -C "$src" tag -fs -a --cleanup=verbatim -u "$subkey!" -F "$scratch/msg" "$tag" "$target" >/dev/null
-    done
+    GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
+        git -C "$src" tag -fs -a --cleanup=verbatim -u "$subkey!" -F "$scratch/msg" v1.2.3 "$target" >/dev/null
 }
 sign_tag 'Fixture release'
 git -C "$src" remote add origin "$scratch/remote.git"
-git -C "$src" push -q origin main refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q origin main refs/tags/v1.2.3
 
 # The operator checkout is on a later main: the gate must not depend on it.
 op="$scratch/operator"
@@ -113,22 +111,19 @@ gate >/dev/null
 }
 
 FIXTURE_GH_VERIFIED=false expect_fail 'GitHub does not report v1.2.3 verified'
-FIXTURE_GH_UNVERIFIED_TAG=go/canon/v1.2.3 expect_fail 'GitHub does not report go/canon/v1.2.3 verified'
-
-# The module tag is part of the release: absent, or at another commit, fails.
-module_object="$(git -C "$scratch/remote.git" rev-parse refs/tags/go/canon/v1.2.3)"
-git -C "$scratch/remote.git" update-ref -d refs/tags/go/canon/v1.2.3
-expect_fail 'remote go/canon/v1.2.3 is absent'
-git -C "$src" commit -q --allow-empty -m 'module tag elsewhere'
-printf 'Fixture release\n' >"$scratch/msg"
-GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
-    git -C "$src" tag -fs -a --cleanup=verbatim -u "$subkey!" -F "$scratch/msg" go/canon/v1.2.3 HEAD >/dev/null
+# A leftover path-prefixed module tag from the two-tag layout is not consulted:
+# present, unsigned and at another commit, it changes nothing, and the gate
+# installs no local ref for it.
+git -C "$src" commit -q --allow-empty -m 'stray module tag elsewhere'
+git -C "$src" tag -fa -m 'stray' go/canon/v1.2.3 HEAD
 git -C "$src" push -q origin main refs/tags/go/canon/v1.2.3
-expect_fail 'does not verify against the pin'
-grep -q 'go/canon/v1.2.3 does not point at the release commit' "$scratch/out"
-# The failed verification left the previously verified local module tag alone.
-[[ "$(git -C "$op" rev-parse refs/tags/go/canon/v1.2.3)" == "$module_object" ]]
-git -C "$scratch/remote.git" update-ref refs/tags/go/canon/v1.2.3 "$module_object"
+gate >/dev/null
+[[ -z "$(git -C "$op" for-each-ref refs/tags/go/)" ]] || {
+    echo 'error: the gate installed a module tag ref' >&2
+    exit 1
+}
+git -C "$scratch/remote.git" update-ref -d refs/tags/go/canon/v1.2.3
+git -C "$src" tag -d go/canon/v1.2.3 >/dev/null
 git -C "$src" reset -q --hard "$commit"
 git -C "$src" push -q --force origin main
 gate >/dev/null
@@ -138,7 +133,7 @@ gate >/dev/null
 signed_local="$(git -C "$op" rev-parse refs/tags/v1.2.3)"
 GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
     git -C "$src" tag -fa -m 'Replacement' v1.2.3 "$commit"
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'does not verify against the pin'
 [[ "$(git -C "$op" rev-parse refs/tags/v1.2.3)" == "$signed_local" ]] || {
     echo 'error: a failed verification replaced the local tag' >&2
@@ -155,7 +150,7 @@ expect_fail 'annotated tag required'
 
 # Restore a valid signed tag: passes again.
 sign_tag 'Fixture release'
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 gate >/dev/null
 
 # The approved primary must come from the maintainer environment.
@@ -183,13 +178,13 @@ printf 'Fixture release\n' >"$scratch/msg"
 GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
     git -C "$src" tag -fs -a --cleanup=verbatim -u "$attacker_sub!" -F "$scratch/msg" v1.2.3 >/dev/null
 git -C "$src" push -q origin main
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'not the approved primary'
 gpgconf --homedir "$GNUPGHOME" --kill all >/dev/null 2>&1 || true
 export GNUPGHOME="$scratch/gpg"
 git -C "$src" reset -q --hard "$commit"
 sign_tag 'Fixture release'
-git -C "$src" push -q --force origin main refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin main refs/tags/v1.2.3
 gate >/dev/null
 
 # An unverified target carrying a marker-writing fake verifier and helper must
@@ -204,7 +199,7 @@ git -C "$src" commit -qm 'unverified target with fake verifier'
 GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
     git -C "$src" tag -fa -m 'Unsigned replacement' v1.2.3
 git -C "$src" push -q origin main
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'does not verify against the pin'
 [[ ! -e "$marker" ]] || {
     echo 'error: code from the unverified tag target was executed' >&2
@@ -212,7 +207,7 @@ expect_fail 'does not verify against the pin'
 }
 # Even a correctly signed target cannot run its own scripts in the gate.
 sign_tag 'Fixture release'
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 gate >/dev/null
 [[ ! -e "$marker" ]] || {
     echo 'error: code from the tag target was executed' >&2
@@ -224,13 +219,12 @@ gate >/dev/null
 anchor_file="$scratch/anchor"
 (cd "$op" && CANONPRIMS_ANCHOR_OUT="$anchor_file" ./scripts/release-verify-published-tag.sh) >/dev/null
 anchor_object="$(awk -F= '$1=="object" {print $2}' "$anchor_file")"
-anchor_module="$(awk -F= '$1=="module_object" {print $2}' "$anchor_file")"
-[[ "$anchor_module" == "$(git -C "$scratch/remote.git" rev-parse refs/tags/go/canon/v1.2.3)" ]]
+# The anchor carries exactly tag, object and commit.
+[[ "$(cut -d= -f1 "$anchor_file" | tr '\n' ' ')" == "tag object commit " ]]
 anchor_commit="$(awk -F= '$1=="commit" {print $2}' "$anchor_file")"
 [[ "$anchor_commit" == "$(git -C "$src" rev-parse HEAD)" ]]
 anchored() {
-    (cd "$op" && CANONPRIMS_EXPECTED_TAG_OBJECT="$anchor_object" CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT="$anchor_module" \
-        CANONPRIMS_EXPECTED_COMMIT="$anchor_commit" \
+    (cd "$op" && CANONPRIMS_EXPECTED_TAG_OBJECT="$anchor_object" CANONPRIMS_EXPECTED_COMMIT="$anchor_commit" \
         ./scripts/release-verify-published-tag.sh)
 }
 anchored >/dev/null
@@ -240,7 +234,7 @@ git -C "$src" add file
 git -C "$src" commit -qm 'different target, same version'
 sign_tag 'Fixture release'
 git -C "$src" push -q origin main
-git -C "$src" push -q --force origin refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin refs/tags/v1.2.3
 before="$(git -C "$op" rev-parse refs/tags/v1.2.3)"
 if anchored >"$scratch/out" 2>&1; then
     echo 'error: approved-key replacement on another commit passed the anchor' >&2
@@ -255,7 +249,7 @@ gate >/dev/null
 # Same commit, approved key, DIFFERENT tag object (new message): fails.
 git -C "$src" reset -q --hard "$anchor_commit"
 sign_tag 'Fixture release, re-signed'
-git -C "$src" push -q --force origin main refs/tags/v1.2.3 refs/tags/go/canon/v1.2.3
+git -C "$src" push -q --force origin main refs/tags/v1.2.3
 [[ "$(git -C "$scratch/remote.git" rev-parse 'refs/tags/v1.2.3^{}')" == "$anchor_commit" ]]
 [[ "$(git -C "$scratch/remote.git" rev-parse refs/tags/v1.2.3)" != "$anchor_object" ]]
 if anchored >"$scratch/out" 2>&1; then
@@ -269,21 +263,11 @@ grep -q 'differs from the verified anchor' "$scratch/out"
         echo 'error: partial anchor accepted' >&2
         exit 1
     }
-grep -q 'must all be 40-hex' "$scratch/out"
-(cd "$op" && CANONPRIMS_EXPECTED_TAG_OBJECT="$anchor_object" CANONPRIMS_EXPECTED_COMMIT="$anchor_commit" \
-    ./scripts/release-verify-published-tag.sh) >"$scratch/out" 2>&1 && exit 1
-grep -q 'must all be 40-hex' "$scratch/out"
-# Restore the original canonical object; the module tag is still the re-signed
-# same-commit replacement, which must not pass the anchor.
+grep -q 'must both be 40-hex' "$scratch/out"
+(cd "$op" && CANONPRIMS_EXPECTED_COMMIT="$anchor_commit" ./scripts/release-verify-published-tag.sh) >"$scratch/out" 2>&1 && exit 1
+grep -q 'must both be 40-hex' "$scratch/out"
+# Restore the original signed object: the anchored check passes again.
 git -C "$scratch/remote.git" update-ref refs/tags/v1.2.3 "$anchor_object"
-[[ "$(git -C "$scratch/remote.git" rev-parse refs/tags/go/canon/v1.2.3)" != "$anchor_module" ]]
-if anchored >"$scratch/out" 2>&1; then
-    echo 'error: same-commit module tag replacement passed the anchor' >&2
-    exit 1
-fi
-grep -q 'remote module tag object differs from the verified anchor' "$scratch/out"
-# Restore both original signed objects: the anchored check passes again.
-git -C "$scratch/remote.git" update-ref refs/tags/go/canon/v1.2.3 "$anchor_module"
 anchored >/dev/null
 
 # Absent remote tag: must fail.

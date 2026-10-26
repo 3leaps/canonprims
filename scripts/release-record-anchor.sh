@@ -15,9 +15,8 @@ case "$destination" in "$root" | "$root"/*)
     exit 1
     ;;
 esac
-[[ "${CANONPRIMS_EXPECTED_TAG_OBJECT:-}" =~ ^[0-9a-f]{40}$ && "${CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT:-}" =~ ^[0-9a-f]{40}$ &&
-    "${CANONPRIMS_EXPECTED_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]] || {
-    echo 'error: original approved tag objects (canonical and module) and commit required' >&2
+[[ "${CANONPRIMS_EXPECTED_TAG_OBJECT:-}" =~ ^[0-9a-f]{40}$ && "${CANONPRIMS_EXPECTED_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'error: original approved tag object and commit required' >&2
     exit 1
 }
 scratch="$(mktemp)"

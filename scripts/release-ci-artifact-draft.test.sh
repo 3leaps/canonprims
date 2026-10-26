@@ -18,10 +18,8 @@ object=1111111111111111111111111111111111111111
 commit="$FIXTURE_COMMIT"
 [[ -z "${CANONPRIMS_EXPECTED_TAG_OBJECT:-}" || "$CANONPRIMS_EXPECTED_TAG_OBJECT" == "$object" ]] || exit 1
 [[ -z "${CANONPRIMS_EXPECTED_COMMIT:-}" || "$CANONPRIMS_EXPECTED_COMMIT" == "$commit" ]] || exit 1
-module=3333333333333333333333333333333333333333
-[[ -z "${CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT:-}" || "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" == "$module" ]] || exit 1
 if [[ -n "${CANONPRIMS_ANCHOR_OUT:-}" ]]; then
- printf 'tag=v1.2.3\nobject=%s\nmodule_object=%s\ncommit=%s\n' "$object" "$module" "$commit" > "$CANONPRIMS_ANCHOR_OUT"
+ printf 'tag=v1.2.3\nobject=%s\ncommit=%s\n' "$object" "$commit" > "$CANONPRIMS_ANCHOR_OUT"
 fi
 SH
 for helper in verify-public-keys verify-staged-public verify-signatures; do
@@ -65,9 +63,11 @@ case "$1 $2" in
    release-identity)
     object=1111111111111111111111111111111111111111
     [[ "${BAD_OBJECT:-0}" == 0 ]] || object=3333333333333333333333333333333333333333
-    module=3333333333333333333333333333333333333333
-    [[ "${BAD_MODULE_IDENTITY:-0}" == 0 ]] || module=4444444444444444444444444444444444444444
-    printf '{"tag":"v1.2.3","object":"%s","module_object":"%s","commit":"%s"}\n' "$object" "$module" "$FIXTURE_COMMIT" > "$dir/release-identity.json"
+    if [[ "${EXTRA_IDENTITY_FIELD:-0}" == 0 ]]; then
+     printf '{"tag":"v1.2.3","object":"%s","commit":"%s"}\n' "$object" "$FIXTURE_COMMIT" > "$dir/release-identity.json"
+    else
+     printf '{"tag":"v1.2.3","object":"%s","module_object":"%s","commit":"%s"}\n' "$object" "$object" "$FIXTURE_COMMIT" > "$dir/release-identity.json"
+    fi
     printf fixture > "$dir/LICENSE-MIT"; printf fixture > "$dir/LICENSE-APACHE"
     [[ "${EXTRA:-0}" == 0 ]] || printf extra > "$dir/.extra" ;;
    *) exit 1 ;;
@@ -88,7 +88,7 @@ git -C "$fixture" commit -qm fixture
 FIXTURE_COMMIT="$(git -C "$fixture" rev-parse HEAD)"
 export PATH="$scratch/bin:$PATH" FIXTURE_CALLS="$scratch/calls" FIXTURE_COMMIT FIXTURE_REPO="$fixture"
 # The recorded ceremony anchor, outside the checkout.
-printf 'tag=v1.2.3\nobject=1111111111111111111111111111111111111111\nmodule_object=3333333333333333333333333333333333333333\ncommit=%s\n' \
+printf 'tag=v1.2.3\nobject=1111111111111111111111111111111111111111\ncommit=%s\n' \
     "$FIXTURE_COMMIT" >"$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_TAG=v1.2.3
@@ -109,9 +109,14 @@ fail env EXTRA=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixt
 fail env MULTIPLE=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 fail env -u CANONPRIMS_RELEASE_ANCHOR_FILE bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 grep -q 'ceremony anchor' "$scratch/output"
-sed 's/^module_object=.*/module_object=5555555555555555555555555555555555555555/' "$scratch/ceremony.anchor" >"$scratch/other.anchor"
+sed 's/^object=.*/object=5555555555555555555555555555555555555555/' "$scratch/ceremony.anchor" >"$scratch/other.anchor"
 fail env CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/other.anchor" bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
-fail env BAD_MODULE_IDENTITY=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
+# A ceremony anchor from the two-tag layout (an extra module_object field) is malformed.
+printf 'module_object=%s\n' 3333333333333333333333333333333333333333 | cat "$scratch/ceremony.anchor" - >"$scratch/other.anchor"
+fail env CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/other.anchor" bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
+grep -q 'malformed ceremony anchor' "$scratch/output"
+# An artifact identity with any field beyond tag, object and commit is refused.
+fail env EXTRA_IDENTITY_FIELD=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 grep -q 'artifact tag object or commit mismatch' "$scratch/output"
 fail env BAD_SOURCE=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 grep -q 'source archive is not gzip' "$scratch/output"

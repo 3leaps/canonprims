@@ -11,8 +11,8 @@ There are two implementations:
 
 - **Rust** crates (`canonprims-core`, `canonprims-json`) and the `canon`
   command.
-- **Go**, a pure-Go module (`github.com/3leaps/canonprims/go/canon`) that
-  uses only the standard library and needs no cgo.
+- **Go**, a pure-Go package (`github.com/3leaps/canonprims/canon`) in the
+  root module, that uses only the standard library and needs no cgo.
 
 Both must pass the same conformance corpus (`conformance/canonical-json/v0`)
 and produce byte-identical results on generated input. CI fails if either
@@ -70,7 +70,7 @@ let digest = canonprims_json::digest(br#"{"b":2,"a":1}"#, &limits, DigestAlg::Sh
 ### Go
 
 ```go
-import "github.com/3leaps/canonprims/go/canon"
+import "github.com/3leaps/canonprims/canon"
 
 out, err := canon.Canonicalize(canon.JCS, input, canon.DefaultLimits())
 d, err := canon.Digest(canon.JCS, input, canon.DefaultLimits(), "sha256")

@@ -2,7 +2,7 @@
 #
 # Dispatched by the maintainer with --ref vX.Y.Z once every earlier crate in
 # config/release/publishable-crates.txt is on crates.io, so the crate packages
-# exactly as consumers will resolve it. Verifies both release tags and the
+# exactly as consumers will resolve it. Verifies the release tag and the
 # release source like the tag workflow, then builds and verifies the package
 # (cargo package compiles it) and keeps the archive and its digest record as
 # a workflow artifact. Read-only: no credentials, no publication.
@@ -53,15 +53,13 @@ jobs:
           tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
           echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
 
-      - name: Restore both annotated tags and verify them against the committed pin
+      - name: Restore the annotated tag and verify it against the committed pin
         env:
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "dispatch with --ref vX.Y.Z" >&2; exit 1; }
           ./scripts/release-restore-tag-ref.sh
-          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
-          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
           source scripts/release-decernor.sh
           resolve_release_decernor
           export RELEASE_DECERNOR_BIN

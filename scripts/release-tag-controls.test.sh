@@ -39,15 +39,20 @@ expect_fail_with 'canonical vX.Y.Z' call tag_version CANONPRIMS_RELEASE_TAG=1.2.
 expect_fail_with 'does not match VERSION' call tag_version CANONPRIMS_RELEASE_TAG=v1.2.4
 call tag_version CANONPRIMS_RELEASE_TAG="v$version"
 
-# The tag set is fixed: the canonical tag and the go/canon module tag, always
-# both, and no file in the checkout narrows it.
-[[ "$(call 'tag_load_set && printf "%s," "${tag_names[@]}"' CANONPRIMS_RELEASE_TAG="v$version")" == "v$version,go/canon/v$version," ]]
+# The tag set is fixed: the one vX.Y.Z tag, and no file in the checkout
+# widens or renames it.
+[[ "$(call 'tag_load_set && printf "%s," "${tag_names[@]}"' CANONPRIMS_RELEASE_TAG="v$version")" == "v$version," ]]
 [[ ! -e "$fixture_root/config/release/release-tags.txt" ]]
-printf 'v\n' >"$repo/config/release/release-tags.txt"
-[[ "$(call 'tag_load_set && printf "%s," "${tag_names[@]}"' CANONPRIMS_RELEASE_TAG="v$version")" == "v$version,go/canon/v$version," ]]
+printf 'v\ngo/canon/v\n' >"$repo/config/release/release-tags.txt"
+[[ "$(call 'tag_load_set && printf "%s," "${tag_names[@]}"' CANONPRIMS_RELEASE_TAG="v$version")" == "v$version," ]]
 rm -f "$repo/config/release/release-tags.txt"
+rm -f "$repo/go.mod"
+expect_fail_with 'go.mod is required at the repository root' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
+# A module in the old nested place does not stand in for the root module.
+mkdir -p "$repo/go/canon"
+printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go/canon/go.mod"
+expect_fail_with 'go.mod is required at the repository root' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
 rm -rf "$repo/go"
-expect_fail_with 'go/canon/go.mod is required' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
 expect_fail_with 'does not match VERSION' call tag_load_set CANONPRIMS_RELEASE_TAG=v9.9.9
 git -C "$repo" checkout -q -- .
 
@@ -57,9 +62,6 @@ messages="$fixture_dir/messages/v$version"
 fixture_messages "$messages" "$version" "v$version"
 msg() { call "tag_message_file '$1'" CANONPRIMS_RELEASE_TAG="v$version" CANONPRIMS_TAG_MESSAGE_DIR="${2:-$messages}"; }
 [[ "$(msg "v$version")" == "$messages/v$version.txt" ]]
-expect_fail_with 'is missing' msg "go/canon/v$version"
-fixture_messages "$messages" "$version" "go/canon/v$version"
-[[ "$(msg "go/canon/v$version")" == "$messages/go__canon__v$version.txt" ]]
 expect_fail_with 'must end in the release tag' msg "v$version" "$fixture_dir/messages"
 # A symlinked ancestor is allowed (macOS /tmp and /var are symlinks); the
 # directory itself must not be a symlink, and its resolved path must still be
@@ -100,8 +102,8 @@ msg "v$version" >/dev/null
 # The preparer writes a skeleton per tag and never clobbers a reviewed file.
 prep="$fixture_dir/prep/v$version"
 in_repo CANONPRIMS_RELEASE_TAG="v$version" CANONPRIMS_TAG_MESSAGE_DIR="$prep" ./scripts/release-prepare-tag-message.py >/dev/null
-[[ -f "$prep/v$version.txt" && -f "$prep/go__canon__v$version.txt" ]]
-grep -q "^go/canon/v$version$" "$prep/go__canon__v$version.txt"
+[[ -f "$prep/v$version.txt" && ! -e "$prep/go__canon__v$version.txt" ]]
+[[ "$(find "$prep" -mindepth 1 | wc -l | tr -d ' ')" == 1 ]]
 grep -q '^Release 1.2.3$' "$prep/v$version.txt"
 cp "$fixture_dir/good.txt" "$prep/v$version.txt"
 in_repo CANONPRIMS_RELEASE_TAG="v$version" CANONPRIMS_TAG_MESSAGE_DIR="$prep" ./scripts/release-prepare-tag-message.py >/dev/null
@@ -126,10 +128,12 @@ printf 'gpg %s\nminisign %064d\n' FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF 0 >"$
 expect_fail_with 'not the approved primary' call tag_approved_primary CANONPRIMS_GPG_SIGNING_FINGERPRINT=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 git -C "$repo" checkout -q -- keys
 
-# The module tag requires the declared module path.
-printf 'module example.com/other\n' >"$repo/go/canon/go.mod"
-expect_fail_with 'must declare module github.com/3leaps/canonprims/go/canon' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
-git -C "$repo" checkout -q -- go
+# The release requires the root module path.
+printf 'module example.com/other\n' >"$repo/go.mod"
+expect_fail_with 'must declare module github.com/3leaps/canonprims$' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
+printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go.mod"
+expect_fail_with 'must declare module github.com/3leaps/canonprims$' call tag_load_set CANONPRIMS_RELEASE_TAG="v$version"
+git -C "$repo" checkout -q -- go.mod
 
 # Tagger identity must be the committed one, and free of header injection.
 call tag_identity CANONPRIMS_TAGGER_NAME='3 Leaps Infosec Team' CANONPRIMS_TAGGER_EMAIL=infosec@3leaps.net

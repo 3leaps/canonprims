@@ -58,12 +58,12 @@ committed() {
 	git cat-file blob "$target:$path" >"$out"
 	[[ -s "$out" ]] || die "committed $path is empty"
 }
-# A release is the canonical tag and the go/canon module tag; the tagged tree
-# must carry the module.
-[[ "$(git ls-tree "$target" -- go/canon/go.mod | awk '{print $1}')" == 100644 ]] ||
-	die 'go/canon/go.mod is required in the tagged commit'
-[[ "$(git cat-file blob "$target:go/canon/go.mod" | sed -n 's/^module[[:space:]]\{1,\}//p' | tr -d '\r')" == "$tag_go_module" ]] ||
-	die "go/canon/go.mod in the tagged commit must declare module $tag_go_module"
+# The release tag also releases the root Go module; the tagged tree must carry
+# it under the expected module path.
+[[ "$(git ls-tree "$target" -- go.mod | awk '{print $1}')" == 100644 ]] ||
+	die 'go.mod is required at the root of the tagged commit'
+[[ "$(git cat-file blob "$target:go.mod" | sed -n 's/^module[[:space:]]\{1,\}//p' | tr -d '\r')" == "$tag_go_module" ]] ||
+	die "go.mod in the tagged commit must declare module $tag_go_module"
 # Every workflow that can publish matches its reviewed digest, both read from
 # the tagged commit (never the working tree).
 python3 -B -E "$root/scripts/release-workflow-pin.py" verify-commit "$target" >/dev/null ||
@@ -106,5 +106,5 @@ for tag in "${tag_names[@]}"; do
 	' "$keyring/status" || die "$tag is not signed by the committed signing subkey, or the key is expired or revoked"
 	count=$((count + 1))
 done
-[[ "$count" -eq 2 ]] || die 'a release is exactly two signed tags'
+[[ "$count" -eq 1 && "${#tag_names[@]}" -eq 1 ]] || die 'a release is exactly one signed tag'
 echo "[ok] $count signed tag(s) verified at $target against the pin committed in that commit"

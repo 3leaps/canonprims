@@ -8,7 +8,7 @@ Record types and naming follow
 
 | ID | Title | Status |
 | --- | --- | --- |
-| [ADR-0001](ADR-0001-release-identity-and-tags.md) | Release identity: two signed tags at one commit, committed public pins | accepted |
+| [ADR-0001](ADR-0001-release-identity-and-tags.md) | Release identity: one signed tag, committed public pins | accepted |
 | [ADR-0002](ADR-0002-no-links-in-release-paths.md) | Release and configuration paths never follow links | accepted |
 | [PDR-0001](PDR-0001-crates-io-publication.md) | crates.io publication: packages verified in CI, token released only for the verified package | accepted |
 | [PDR-0002](PDR-0002-dependency-and-build-policy.md) | Dependencies come from crates.io only, cool before adoption, and build at a pinned toolchain | accepted |

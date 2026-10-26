@@ -36,11 +36,10 @@ remote_object="$(git ls-remote --exit-code origin "refs/tags/$tag" | awk '{print
 # must still equal it before any local ref changes: a replacement tag, even one
 # signed by the approved key, must not move the release to other packages.
 expected_object="${CANONPRIMS_EXPECTED_TAG_OBJECT:-}"
-expected_module="${CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT:-}"
 expected_commit="${CANONPRIMS_EXPECTED_COMMIT:-}"
-if [[ -n "$expected_object" || -n "$expected_module" || -n "$expected_commit" ]]; then
-    [[ "$expected_object" =~ ^[0-9a-f]{40}$ && "$expected_module" =~ ^[0-9a-f]{40}$ && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] ||
-        die 'expected tag object, module tag object and commit must all be 40-hex'
+if [[ -n "$expected_object" || -n "$expected_commit" ]]; then
+    [[ "$expected_object" =~ ^[0-9a-f]{40}$ && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] ||
+        die 'expected tag object and commit must both be 40-hex'
     [[ "$remote_object" == "$expected_object" ]] || die 'remote tag object differs from the verified anchor'
 fi
 # Fetch into a private namespace and verify there; local refs/tags change only
@@ -50,14 +49,6 @@ cleanup_staging() { git for-each-ref --format='%(refname)' "${staging%tags/}" | 
 trap cleanup_staging EXIT
 git fetch --quiet --no-tags origin "+refs/tags/$tag:$staging$tag"
 [[ "$(git rev-parse "$staging$tag")" == "$remote_object" ]] || die 'fetched tag differs from remote tag object'
-# The companion module tag is part of the same release; verify-pinned-tag checks
-# that it is signed and peels to the same commit.
-module_tag="go/canon/$tag"
-module_object="$(git ls-remote --exit-code origin "refs/tags/$module_tag" | awk '{print $1}')" || die "remote $module_tag is absent"
-[[ "$module_object" =~ ^[0-9a-f]{40}$ ]] || die 'remote module tag object is invalid'
-[[ -z "$expected_module" || "$module_object" == "$expected_module" ]] || die 'remote module tag object differs from the verified anchor'
-git fetch --quiet --no-tags origin "+refs/tags/$module_tag:$staging$module_tag"
-[[ "$(git rev-parse "$staging$module_tag")" == "$module_object" ]] || die 'fetched module tag differs from remote tag object'
 [[ "$(git cat-file -t "$remote_object")" == tag ]] || die 'annotated tag required'
 commit="$(git rev-parse "$staging$tag^{}")"
 [[ -z "$expected_commit" || "$commit" == "$expected_commit" ]] || die 'tagged commit differs from the verified anchor'
@@ -69,21 +60,15 @@ pinned="$(git cat-file blob "$commit:keys/expected-fingerprints.txt" 2>/dev/null
 [[ "$pinned" == "$approved" ]] || die 'pin in the tagged commit is not the approved primary'
 CANONPRIMS_RELEASE_TAG="$tag" "$root/scripts/verify-pinned-tag.sh" --published --staged-prefix "$staging" >/dev/null ||
     die 'published tag signature does not verify against the pin committed in its commit'
-for pair in "$tag $remote_object" "$module_tag $module_object"; do
-    read -r name object <<<"$pair"
-    tag_json="$(release_gh api "repos/3leaps/canonprims/git/tags/$object")" || die "GitHub tag object for $name unavailable"
-    jq -e --arg tag "$name" --arg commit "$commit" \
-        '.tag == $tag and .object.type == "commit" and .object.sha == $commit and .verification.verified == true and .verification.reason == "valid"' \
-        <<<"$tag_json" >/dev/null || die "GitHub does not report $name verified"
-done
-# Every check passed: now, and only now, install the verified objects as the
-# local tags.
-for pair in "$tag $remote_object" "$module_tag $module_object"; do
-    read -r name object <<<"$pair"
-    git update-ref "refs/tags/$name" "$object"
-done
-echo "[ok] published $tag and $module_tag verified against the committed pin and GitHub"
+tag_json="$(release_gh api "repos/3leaps/canonprims/git/tags/$remote_object")" || die "GitHub tag object for $tag unavailable"
+jq -e --arg tag "$tag" --arg commit "$commit" \
+    '.tag == $tag and .object.type == "commit" and .object.sha == $commit and .verification.verified == true and .verification.reason == "valid"' \
+    <<<"$tag_json" >/dev/null || die "GitHub does not report $tag verified"
+# Every check passed: now, and only now, install the verified object as the
+# local tag.
+git update-ref "refs/tags/$tag" "$remote_object"
+echo "[ok] published $tag verified against the committed pin and GitHub"
 # Machine-readable anchor for callers that bind later steps to this result.
 if [[ -n "${CANONPRIMS_ANCHOR_OUT:-}" ]]; then
-    printf 'tag=%s\nobject=%s\nmodule_object=%s\ncommit=%s\n' "$tag" "$remote_object" "$module_object" "$commit" >"$CANONPRIMS_ANCHOR_OUT"
+    printf 'tag=%s\nobject=%s\ncommit=%s\n' "$tag" "$remote_object" "$commit" >"$CANONPRIMS_ANCHOR_OUT"
 fi

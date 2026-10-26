@@ -1,8 +1,8 @@
 # Release Checklist
 
-How a maintainer cuts a canonprims release. A release is two signed annotated
-tags at one commit of `main`, `vX.Y.Z` and `go/canon/vX.Y.Z`
-([ADR-0001](docs/decisions/ADR-0001-release-identity-and-tags.md)); the
+How a maintainer cuts a canonprims release. A release is one signed annotated
+tag, `vX.Y.Z`, at a commit of `main`; it releases the Rust crates and the root
+Go module together ([ADR-0001](docs/decisions/ADR-0001-release-identity-and-tags.md)); the
 signing material and the trust rules are in
 [docs/security/README.md](docs/security/README.md).
 
@@ -87,29 +87,28 @@ tag verification checks the pin in the tagged commit. To change one:
 
 ## 2. Tags
 
-- [ ] `make release-prepare-tag-message`. It creates `vX.Y.Z.txt` and
-  `go__canon__vX.Y.Z.txt` in `CANONPRIMS_TAG_MESSAGE_DIR` and never overwrites.
-  Complete each: subject `Release X.Y.Z` for the canonical tag and the tag
-  name for the module tag, the release text, and the attribution footer.
+- [ ] `make release-prepare-tag-message`. It creates `vX.Y.Z.txt` in
+  `CANONPRIMS_TAG_MESSAGE_DIR` and never overwrites. Complete it: subject
+  `Release X.Y.Z`, the release text, and the attribution footer.
 - [ ] `make release-validate-pin`.
-- [ ] `make release-tag`: both tags, signed by the committed subkey, local only,
+- [ ] `make release-tag`: the tag, signed by the committed subkey, local only,
   at `HEAD`, which must equal `origin/main`.
-- [ ] `make release-verify-tag`: message bytes, tagger, common target, and each
+- [ ] `make release-verify-tag`: message bytes, tagger, target, and the
   signature against the pin committed in the tagged commit.
-- [ ] `make release-push-tag`: one atomic push, then the remote objects are
+- [ ] `make release-push-tag`: one push, then the remote object is
   re-verified.
-- [ ] `make release-verify-remote-tag`: both tags verify against the committed
-  pin and the approved primary, and GitHub reports both verified.
+- [ ] `make release-verify-remote-tag`: the tag verifies against the committed
+  pin and the approved primary, and GitHub reports it verified.
 - [ ] Record the ceremony identity once, outside the repository, and keep
   `CANONPRIMS_RELEASE_ANCHOR_FILE` set for every later step (download refuses
   to run without it):
-  `CANONPRIMS_EXPECTED_TAG_OBJECT=<vX.Y.Z object> CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT=<go/canon/vX.Y.Z object> CANONPRIMS_EXPECTED_COMMIT=<commit> make release-record-anchor`.
-  Every later step (download, draft, sign, upload, publish) is bound to both
-  tag objects and the commit.
+  `CANONPRIMS_EXPECTED_TAG_OBJECT=<vX.Y.Z object> CANONPRIMS_EXPECTED_COMMIT=<commit> make release-record-anchor`.
+  Every later step (download, draft, sign, upload, publish) is bound to the
+  tag object and the commit.
 
 ## 3. Release workflow
 
-- [ ] The tag-triggered `Release` workflow is green: both tags verified, the
+- [ ] The tag-triggered `Release` workflow is green: the tag verified, the
   committed anchors checked by the pinned decernor, five CLI archives, the
   source archive, the SBOM and the release identity uploaded as workflow
   artifacts. `make release-download` rebuilds the source archive from the
@@ -168,7 +167,7 @@ For each crate in order (`CRATE=canonprims-core`, then
   crate=$CRATE`).
 - [ ] `make release-crates-fetch CRATE=$CRATE`: downloads the package and its
   record from the exact successful run at the anchored commit and checks the
-  record names both tag objects, the commit, that run and attempt, and the
+  record names the tag object, the commit, that run and attempt, and the
   archive digest. `CANONPRIMS_CRATE_RUN_ID` selects the run when there is
   more than one.
 - [ ] `make release-crate-dry-run CRATE=$CRATE`: the local package (no
@@ -180,6 +179,6 @@ For each crate in order (`CRATE=canonprims-core`, then
 
 ## 6. After the release
 
-- [ ] `go list -m github.com/3leaps/canonprims/go/canon@vX.Y.Z` resolves.
-- [ ] Someone other than the publisher verifies the published release: both
-  tags, the anchors, the manifests and every digest.
+- [ ] `go list -m github.com/3leaps/canonprims@vX.Y.Z` resolves.
+- [ ] Someone other than the publisher verifies the published release: the
+  tag, the anchors, the manifests and every digest.

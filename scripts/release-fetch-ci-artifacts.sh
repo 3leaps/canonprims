@@ -17,16 +17,15 @@ mkdir -p "$dest"
 [[ -z "$(find "$dest" -mindepth 1 -maxdepth 1 -print)" ]] || die 'destination must be empty; clean explicitly first'
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
-# The original ceremony anchor (both tag objects and the commit) binds the
+# The original ceremony anchor (the tag object and the commit) binds the
 # download: a tag replaced since the ceremony, even re-signed by the approved
 # key at the same commit, fails here before anything is staged.
 load_ceremony_anchor || die 'the recorded ceremony anchor (CANONPRIMS_RELEASE_ANCHOR_FILE) is required'
 CANONPRIMS_ANCHOR_OUT="$scratch/anchor" "$root/scripts/release-verify-published-tag.sh"
 commit="$(awk -F= '$1=="commit" {print $2}' "$scratch/anchor")"
 object="$(awk -F= '$1=="object" {print $2}' "$scratch/anchor")"
-module_object="$(awk -F= '$1=="module_object" {print $2}' "$scratch/anchor")"
-[[ "$commit" =~ ^[0-9a-f]{40}$ && "$object" =~ ^[0-9a-f]{40}$ && "$module_object" =~ ^[0-9a-f]{40}$ ]] || die 'verification returned no valid anchor'
-[[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" && "$module_object" == "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" &&
+[[ "$commit" =~ ^[0-9a-f]{40}$ && "$object" =~ ^[0-9a-f]{40}$ ]] || die 'verification returned no valid anchor'
+[[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" &&
     "$commit" == "$CANONPRIMS_EXPECTED_COMMIT" ]] || die 'verified tags differ from the recorded ceremony anchor'
 runs="$(release_gh run list --repo "$CANONPRIMS_REPOSITORY" --workflow release.yml --branch "$tag" --limit 100 \
     --json databaseId,headSha,conclusion,event \
@@ -53,8 +52,8 @@ release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name source --d
 release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name release-identity --dir "$scratch/download/identity"
 # A successful rerun during download must not silently change the attempt.
 [[ "$(release_gh api "repos/$CANONPRIMS_REPOSITORY/actions/runs/$run" --jq .run_attempt)" == "$attempt" ]] || die 'run attempt changed during download'
-jq -e --arg tag "$tag" --arg object "$object" --arg module_object "$module_object" --arg commit "$commit" \
-    '.tag == $tag and .object == $object and .module_object == $module_object and .commit == $commit' "$scratch/download/identity/release-identity.json" >/dev/null || die 'artifact tag object or commit mismatch'
+jq -e --arg tag "$tag" --arg object "$object" --arg commit "$commit" \
+    '(keys == ["commit", "object", "tag"]) and .tag == $tag and .object == $object and .commit == $commit' "$scratch/download/identity/release-identity.json" >/dev/null || die 'artifact tag object or commit mismatch'
 [[ "$(find "$scratch/download" -name release-identity.json -type f | wc -l | tr -d ' ')" == 1 ]] || die 'duplicate or missing artifact identity'
 while IFS= read -r -d '' file; do
     [[ -f "$file" && ! -L "$file" ]] || die 'unsafe artifact entry'

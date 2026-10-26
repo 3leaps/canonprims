@@ -199,7 +199,7 @@ PYTHON
 
 # Bind operator work to the staged annotated object and peeled commit.
 require_published_anchor() {
-    local directory="$1" anchor tag object module commit
+    local directory="$1" anchor tag object commit
     tag="$(release_tag)"
     anchor="$directory.anchor"
     [[ -s "$anchor" && -f "$anchor" && ! -L "$anchor" ]] || {
@@ -211,9 +211,8 @@ require_published_anchor() {
         return 1
     }
     object="$(awk -F= '$1=="object" {print $2}' "$anchor")"
-    module="$(awk -F= '$1=="module_object" {print $2}' "$anchor")"
     commit="$(awk -F= '$1=="commit" {print $2}' "$anchor")"
-    [[ "$object" =~ ^[0-9a-f]{40}$ && "$module" =~ ^[0-9a-f]{40}$ && "$commit" =~ ^[0-9a-f]{40}$ ]] || {
+    [[ "$object" =~ ^[0-9a-f]{40}$ && "$commit" =~ ^[0-9a-f]{40}$ ]] || {
         echo 'error: malformed staged identity anchor' >&2
         return 1
     }
@@ -221,14 +220,12 @@ require_published_anchor() {
     # the checkout is the authority, and every staged field must equal it.
     (
         load_ceremony_anchor || exit 2
-        [[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" && "$module" == "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" &&
-            "$commit" == "$CANONPRIMS_EXPECTED_COMMIT" ]] || {
+        [[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" && "$commit" == "$CANONPRIMS_EXPECTED_COMMIT" ]] || {
             echo 'error: staged anchor differs from the recorded ceremony anchor' >&2
             exit 1
         }
     ) || return 1
-    CANONPRIMS_RELEASE_TAG="$tag" CANONPRIMS_EXPECTED_TAG_OBJECT="$object" \
-        CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT="$module" CANONPRIMS_EXPECTED_COMMIT="$commit" \
+    CANONPRIMS_RELEASE_TAG="$tag" CANONPRIMS_EXPECTED_TAG_OBJECT="$object" CANONPRIMS_EXPECTED_COMMIT="$commit" \
         "$(release_repo_root)/scripts/release-verify-published-tag.sh"
 }
 
@@ -254,16 +251,16 @@ import sys
 entries = {}
 for line in Path(sys.argv[1]).read_text().splitlines():
     key, sep, value = line.partition('=')
-    if not sep or key in entries or key not in ('tag', 'object', 'module_object', 'commit', 'run', 'attempt'):
+    if not sep or key in entries or key not in ('tag', 'object', 'commit', 'run', 'attempt'):
         sys.exit('error: malformed ceremony anchor')
     entries[key] = value
-if entries.get('tag') != sys.argv[2] or any(not re.fullmatch('[0-9a-f]{40}', entries.get(key, '')) for key in ('object', 'module_object', 'commit')):
+if entries.get('tag') != sys.argv[2] or any(not re.fullmatch('[0-9a-f]{40}', entries.get(key, '')) for key in ('object', 'commit')):
     sys.exit('error: ceremony tag/object/commit mismatch or missing')
-print(entries['object'], entries['module_object'], entries['commit'])
+print(entries['object'], entries['commit'])
 PYTHON
     )" || return 1
-    read -r CANONPRIMS_EXPECTED_TAG_OBJECT CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT CANONPRIMS_EXPECTED_COMMIT <<<"$identity"
-    export CANONPRIMS_EXPECTED_TAG_OBJECT CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT CANONPRIMS_EXPECTED_COMMIT
+    read -r CANONPRIMS_EXPECTED_TAG_OBJECT CANONPRIMS_EXPECTED_COMMIT <<<"$identity"
+    export CANONPRIMS_EXPECTED_TAG_OBJECT CANONPRIMS_EXPECTED_COMMIT
 }
 
 verify_remote_release_bytes() (

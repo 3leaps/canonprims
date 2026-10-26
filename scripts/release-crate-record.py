@@ -3,9 +3,9 @@
 """Check a CI crate verification record against the release it is used for.
 
 Usage: release-crate-record.py check RECORD ARCHIVE --tag T --object O
-           --module-object M --commit C --crate N --version V --registry R
-Prints the verified SHA-256 when the record names this repository, both tag
-objects, the commit, the crate, the version and crates.io, and ARCHIVE has
+           --commit C --crate N --version V --registry R
+Prints the verified SHA-256 when the record names this repository, the tag
+object, the commit, the crate, the version and crates.io, and ARCHIVE has
 that digest.
 """
 
@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-KEYS = {"format", "repository", "tag", "object", "module_object", "commit", "crate", "version",
+KEYS = {"format", "repository", "tag", "object", "commit", "crate", "version",
         "cargo", "registry", "sha256", "run_id", "run_attempt"}
 
 
@@ -25,12 +25,12 @@ def fail(reason):
 
 def main():
     args = sys.argv[1:]
-    if len(args) != 17 or args[0] != "check":
-        fail("usage: release-crate-record.py check RECORD ARCHIVE --tag T --object O --module-object M --commit C --crate N --version V --registry R")
+    if len(args) != 15 or args[0] != "check":
+        fail("usage: release-crate-record.py check RECORD ARCHIVE --tag T --object O --commit C --crate N --version V --registry R")
     record_path, archive_path = args[1], args[2]
     options = dict(zip(args[3::2], args[4::2]))
     expected = {"tag": options.get("--tag"), "object": options.get("--object"),
-                "module_object": options.get("--module-object"), "commit": options.get("--commit"),
+                "commit": options.get("--commit"),
                 "crate": options.get("--crate"), "version": options.get("--version"),
                 "registry": options.get("--registry")}
     if None in expected.values():

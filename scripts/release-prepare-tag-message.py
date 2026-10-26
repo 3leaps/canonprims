@@ -56,10 +56,10 @@ def validate_message(data: bytes, subject: str | None = None) -> str:
 
 
 def tag_set(root: Path, version: str) -> list[str]:
-    """The fixed release tag set: the canonical tag and the go/canon module tag."""
-    if not (root / "go/canon/go.mod").is_file():
-        fail("go/canon/go.mod is required; a release carries both tags")
-    return [f"v{version}", f"go/canon/v{version}"]
+    """The fixed release tag set: the one tag the crates and the root Go module share."""
+    if not (root / "go.mod").is_file():
+        fail("go.mod is required at the repository root; the release tag also releases the Go module")
+    return [f"v{version}"]
 
 
 def message_dir(root: Path, tag: str) -> Path:

@@ -50,7 +50,7 @@ cp "$fixture/keys/expected-fingerprints."{txt,ndjson} "$scratch/assets/"
 cp "$fixture/docs/security/release-signing-keys.asc" "$scratch/assets/canonprims-release-signing-key.asc"
 cp "$scratch/public.pub" "$scratch/assets/canonprims-minisign.pub"
 cp "$fixture/docs/releases/v1.2.3.md" "$scratch/assets/release-notes-v1.2.3.md"
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$commit" >"$scratch/assets.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$commit" >"$scratch/assets.anchor"
 cp "$scratch/assets.anchor" "$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/ceremony.anchor"
 # Committed current operator trust data/version is deliberately different.

@@ -3,8 +3,8 @@
 //! The `canonical-json/v0` conformance corpus.
 //!
 //! The corpus lives at the repository root (`conformance/`) and is shared
-//! with the Go twin. `CANON_CORPUS_DIR` overrides the location;
-//! `CANON_RESULTS_OUT` writes the harness result lines for the
+//! with the Go twin. `CANONPRIMS_CORPUS_DIR` overrides the location;
+//! `CANONPRIMS_RESULTS_OUT` writes the harness result lines for the
 //! cross-language comparison.
 
 use std::fs;
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use canonprims_json::canonprims_core::{Code, DigestAlg, Limits};
 
 fn corpus_dir() -> PathBuf {
-    std::env::var_os("CANON_CORPUS_DIR").map_or_else(
+    std::env::var_os("CANONPRIMS_CORPUS_DIR").map_or_else(
         || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance/canonical-json/v0"),
         PathBuf::from,
     )
@@ -281,7 +281,7 @@ fn corpus() {
             (other, _) => failures.push(format!("{}: check on input gave {other:?}", case.id)),
         }
     }
-    if let Some(path) = std::env::var_os("CANON_RESULTS_OUT") {
+    if let Some(path) = std::env::var_os("CANONPRIMS_RESULTS_OUT") {
         fs::write(path, &results).unwrap();
     }
     assert!(
