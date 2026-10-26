@@ -1,4 +1,5 @@
 check-registry-config
+content-check
 deps-check
 doctor
 jq-portability
@@ -20,7 +21,7 @@ release-validate-pin
 release-verify-published-tag
 release-workflow-permissions
 release-write-guards
-surface-check
+surface-scan
 verify-pinned-tag
 verify-signatures
 verify-staged-public

@@ -14,6 +14,10 @@
 /.env
 /.env.*
 
+# limensafe scan configuration and catalogs are never kept in this repository
+# (failsafe only: they live outside it)
+/.limensafe/
+
 # Python bytecode (convenience filter only)
 __pycache__/
 *.pyc

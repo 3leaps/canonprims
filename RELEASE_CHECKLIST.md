@@ -16,6 +16,8 @@ maintainer's machine. CI holds no signing, release or registry authority.
   the recommended minimum in `.goneat/tools.yaml` and fails on any tool that
   is missing, older, or whose version it cannot read.
 - decernor 0.1.8 or newer as a regular file at an absolute path
+- limensafe and the maintainer's catalog, which the pre-tag gate requires for
+  the public-surface scan (it never runs in CI)
 - The ceremony environment (outside this repository):
 
   ```bash
@@ -29,6 +31,7 @@ maintainer's machine. CI holds no signing, release or registry authority.
   export CANONPRIMS_GPG_SIGNING_FINGERPRINT='<primary>'   # approved primary, from a trusted channel
   export CANONPRIMS_MINISIGN_KEY=/path/to/minisign/secret/key
   export CANONPRIMS_RELEASE_ANCHOR_FILE=/path/outside/the/repository/anchor
+  export LIMENSAFE_CATALOG_PATH=/path/outside/the/repository/catalog
   ```
 
   A bare `RELEASE_TAG` is refused by `make`.

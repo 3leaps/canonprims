@@ -25,7 +25,19 @@ how the change came about.
 
 ## Checks
 
-Before a push, `make prepush` runs the maintainer's surface check when
-`CANONPRIMS_SURFACE_CHECK` names one (an executable outside the repository);
-the pre-tag gate requires it. A clean check does not replace reading the
-public text.
+Two checks, split by what they may know:
+
+- `make check`, run in CI on every change, includes `scripts/content-check.py`.
+  It refuses generic shapes in tracked files: local home paths, private-key
+  blocks, access tokens and "remove before commit" markers. It holds no
+  vocabulary, so it is safe in a public workflow.
+- `make pr-final`, run by the maintainer before opening or updating a pull
+  request, adds `scripts/surface-scan.sh`: limensafe with the maintainer's
+  catalog, named by `LIMENSAFE_CATALOG_PATH` and kept outside this repository.
+  It scans the tracked tree, each new commit message, the pull-request title
+  and body, and the branch name, after proving the catalog blocks its own
+  canary. The catalog is never given to CI. Unset, the scan is skipped with a
+  warning under `make prepush` and required under `make pr-final` and the
+  pre-tag gate; a set but invalid path fails.
+
+A clean scan does not replace reading the public text.

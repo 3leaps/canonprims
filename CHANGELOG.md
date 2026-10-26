@@ -21,3 +21,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   that builds the `canon` CLI for five platforms, and crates.io publication
   in which package verification is compiled only in credential-free CI and
   the registry token is released only for the verified package's checksum
+- Public-surface checks: a vocabulary-free content check of tracked files in
+  `make check`, and a maintainer-only limensafe scan in `make pr-final`
