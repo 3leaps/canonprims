@@ -3,8 +3,9 @@
 //! `canon`: canonical serialization from the command line.
 //!
 //! Data goes to stdout; diagnostics go to stderr. Output is the canonical
-//! bytes (no trailing newline), a digest line, a scheme description, or
-//! nothing (`--check`).
+//! bytes (no trailing newline), a digest line, a scheme description, a
+//! version line, or nothing (`--check`). The JSON documents (`info`,
+//! `version --extended`) are themselves RFC 8785 canonical, plus a newline.
 //!
 //! Exit codes:
 //! - 0: success (canonical bytes written, or `--check` found canonical input)
@@ -46,6 +47,12 @@ enum Command {
         /// Scheme identifier.
         #[arg(default_value = "jcs/rfc8785")]
         scheme: String,
+    },
+    /// Print the version; `--extended` prints the build identity as JSON.
+    Version {
+        /// Name, version, built-in schemes and their corpus digests, as JSON.
+        #[arg(long)]
+        extended: bool,
     },
 }
 
@@ -89,6 +96,7 @@ fn main() -> ExitCode {
     match cli.command {
         Command::Jcs(args) => jcs(&args),
         Command::Info { scheme } => info(&scheme),
+        Command::Version { extended } => version(extended),
     }
 }
 
@@ -143,6 +151,22 @@ fn info(scheme: &str) -> ExitCode {
             ExitCode::from(EXIT_USAGE)
         }
     }
+}
+
+fn version(extended: bool) -> ExitCode {
+    let version = env!("CARGO_PKG_VERSION");
+    let doc = if extended {
+        // Members in RFC 8785 order; every value is a build-time constant
+        // with no character that needs escaping.
+        let i = canonprims_json::scheme_info();
+        format!(
+            "{{\"name\":\"canon\",\"schemes\":[{{\"corpus\":\"{}\",\"corpus_digest\":\"{}\",\"scheme\":\"{}\",\"spec\":\"{}\"}}],\"version\":\"{version}\"}}\n",
+            i.corpus, i.corpus_digest, i.scheme, i.spec
+        )
+    } else {
+        format!("canon {version}\n")
+    };
+    output_status(write_out(doc.as_bytes()))
 }
 
 /// Read at most `max_bytes + 1` bytes, so an oversized input is refused by

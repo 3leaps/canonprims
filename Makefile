@@ -13,7 +13,7 @@ SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 .PHONY: all help check precommit prepush fmt fmt-check lint test test-rust test-go msrv-check
-.PHONY: surface-check jq-portability
+.PHONY: surface-check jq-portability doctor
 .PHONY: corpus corpus-check witness witness-controls crosscheck deny deps-check workflow-pin version version-check build clean
 .PHONY: release-tooling-test release-check release-preflight release-prepare-tag-message release-tag release-push-tag
 .PHONY: release-verify-tag release-verify-remote-tag release-record-anchor release-export-pin release-validate-pin
@@ -102,6 +102,9 @@ jq-portability: ## jq variables are valid in jq 1.6 and 1.7
 deps-check: ## Leaf rule: no prim, rsfulmen or Go module dependencies
 	scripts/deps-check.sh
 	@echo "[ok] deps-check"
+
+doctor: ## Report host tool versions against the recommended minimums (DOCTOR_SCOPE=release|dev)
+	@scripts/doctor.sh $(or $(DOCTOR_SCOPE),release)
 
 version: ## Print the version
 	@echo $(VERSION)

@@ -121,6 +121,55 @@ fn info_is_json() {
     );
 }
 
+#[test]
+fn version_line_and_extended_json() {
+    let version = env!("CARGO_PKG_VERSION");
+    let plain = canon(&["version"], b"");
+    assert_eq!(plain.status.code(), Some(0));
+    assert_eq!(plain.stdout, format!("canon {version}\n").into_bytes());
+    assert!(plain.stderr.is_empty());
+
+    let ext = canon(&["version", "--extended"], b"");
+    assert_eq!(ext.status.code(), Some(0));
+    assert!(ext.stderr.is_empty());
+    let text = String::from_utf8(ext.stdout).unwrap();
+    let doc = text.strip_suffix('\n').expect("one trailing newline");
+    assert!(
+        doc.starts_with(
+            r#"{"name":"canon","schemes":[{"corpus":"canonical-json/v0","corpus_digest":"sha256:"#
+        ),
+        "{doc}"
+    );
+    assert!(
+        doc.ends_with(&format!(
+            r#""scheme":"jcs/rfc8785","spec":"RFC 8785"}}],"version":"{version}"}}"#
+        )),
+        "{doc}"
+    );
+    // The document is its own canonical form.
+    let again = canon(&["jcs", "--check", "-"], doc.as_bytes());
+    assert_eq!(
+        again.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&again.stderr)
+    );
+}
+
+#[test]
+fn info_json_is_canonical() {
+    let out = canon(&["info"], b"");
+    let text = String::from_utf8(out.stdout).unwrap();
+    let doc = text.strip_suffix('\n').expect("one trailing newline");
+    let again = canon(&["jcs", "--check", "-"], doc.as_bytes());
+    assert_eq!(
+        again.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&again.stderr)
+    );
+}
+
 /// A caller-raised depth limit must not overflow the stack: run in a child
 /// process so an abort fails this test instead of the harness.
 #[test]

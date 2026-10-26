@@ -101,3 +101,4 @@ MIT OR Apache-2.0. All dependencies must stay permissively licensed.
 | `go.mod`, `canon/` | Pure-Go twin (root module, standard library only) |
 | `scripts/crosscheck.sh` | Rust/Go byte-for-byte agreement |
 | `VERSION` | Version SSOT |
+| `.fulmen/repo.yaml` | Repository class declaration (prims, Profile B, leaf) |

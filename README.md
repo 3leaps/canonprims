@@ -26,7 +26,16 @@ differently in each (ryu-based in Rust, `strconv` with an exact `math/big`
 integer check in Go), and the corpus expectations are hand-derived and
 checked against ECMAScript and a separate Python checker.
 
-There is no TypeScript binding yet.
+### Packages
+
+| Language | Package | Status |
+| --- | --- | --- |
+| Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.0 |
+| Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.0 |
+| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation | planned |
+| Python | `canonprims` (PyPI), from the Rust implementation | planned |
+
+There is no TypeScript or Python binding yet.
 
 ## Status
 
@@ -44,6 +53,8 @@ sha256:...
 $ canon jcs --check fixture.json    # exit 0 only if already canonical
 $ canon info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
+$ canon version --extended
+{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.0"}
 ```
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:
@@ -105,6 +116,7 @@ defects, are in [docs/spec/jcs-rfc8785.md](docs/spec/jcs-rfc8785.md).
 make check        # everything CI runs: fmt, lint, tests, corpus, witnesses, crosscheck, deny
 make crosscheck   # Rust and Go agreement only
 make corpus       # regenerate the corpus from scripts/canonical-json-corpus.py
+make doctor       # host tool versions against the recommended minimums
 ```
 
 Requirements:
@@ -114,6 +126,16 @@ Requirements:
 - Python 3.
 - Node.js and network access to GitHub, for the independent corpus witnesses.
 - `cargo-deny`.
+
+`.goneat/tools.yaml` declares a recommended minimum version for each host tool
+the checks and the release ceremony run (git, gh, jq, Python, gpg, minisign,
+Go), and `make doctor` reports each one against it (`DOCTOR_SCOPE=dev` for the
+development set). It fails when a tool is missing, older, or prints a version
+it cannot read; `config/doctor-versions.txt` says how each tool's version is
+read. The minimums are the versions this repository is known to
+work with, not proven lower bounds; older versions may work, YMMV. Two are
+firm: jq 1.6 rejects a jq keyword used as a variable name, and the release
+scripts refuse Python older than 3.11.
 
 The corpus expectations are written by hand or taken from RFC 8785. They are
 not produced by either implementation. `make witness` checks the expected

@@ -10,7 +10,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - RFC 8785 JSON Canonicalization Scheme (`jcs/rfc8785`) over a strict I-JSON
   loader, in Rust (`canonprims-core`, `canonprims-json`) and in pure Go
   (`github.com/3leaps/canonprims/canon`), with the same refusal codes and explicit limits
-- `canon` command: `canon jcs [--check] [--digest] FILE|-` and `canon info`
+- `canon` command: `canon jcs [--check] [--digest] FILE|-`, `canon info` and
+  `canon version [--extended]`
 - Conformance corpus `canonical-json/v0`, witnessed against ECMAScript and a
   separate Python checker
 - Rust/Go byte-for-byte agreement gate on the corpus and on generated input
