@@ -75,7 +75,7 @@ grep -q 'go list failed' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
 mkdir -p "$scratch/gobin"
 real_go="$(command -v go)"
 # shellcheck disable=SC2016 # expands in the stub
-printf '#!/bin/bash\nif [[ "$1" == list ]]; then printf "%%s\\n" github.com/3leaps/canonprims/canon example.com/other; exit 0; fi\nexec %q "$@"\n' \
+printf '#!/bin/bash\nif [[ "$1" == list && " $* " == *" -deps "* ]]; then printf "%%s\\n" github.com/3leaps/canonprims/canon example.com/other; exit 0; fi\nexec %q "$@"\n' \
 	"$real_go" >"$scratch/gobin/go"
 chmod +x "$scratch/gobin/go"
 rm -rf "$scratch/canon/internal/probe"
@@ -85,12 +85,36 @@ if (cd "$scratch" && PATH="$scratch/gobin:$PATH" scripts/deps-check.sh) >"$scrat
 fi
 grep -q 'imports a non-standard package' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
 # A look-alike module path is not the module's own.
-printf '#!/bin/bash\nif [[ "$1" == list ]]; then echo github.com/3leaps/canonprims-evil/x; exit 0; fi\nexec %q "$@"\n' \
+printf '#!/bin/bash\nif [[ "$1" == list && " $* " == *" -deps "* ]]; then echo github.com/3leaps/canonprims-evil/x; exit 0; fi\nexec %q "$@"\n' \
 	"$real_go" >"$scratch/gobin/go"
 if (cd "$scratch" && PATH="$scratch/gobin:$PATH" scripts/deps-check.sh) >"$scratch/out" 2>&1; then
 	echo 'error: accepted a look-alike module path' >&2
 	exit 1
 fi
 grep -q 'imports a non-standard package' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+# A foreign package's test variant is not the module's own.
+printf '#!/bin/bash\nif [[ "$1" == list && " $* " == *" -deps "* ]]; then echo "example.com/other [github.com/3leaps/canonprims/canon.test]"; exit 0; fi\nexec %q "$@"\n' \
+	"$real_go" >"$scratch/gobin/go"
+if (cd "$scratch" && PATH="$scratch/gobin:$PATH" scripts/deps-check.sh) >"$scratch/out" 2>&1; then
+	echo 'error: accepted a foreign test-variant package' >&2
+	exit 1
+fi
+grep -q 'imports a non-standard package' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+# Imports outside the default build: a test-only import, an import behind a
+# build tag for another platform, and an import only reachable with cgo on.
+# Each is a go list failure in at least one cell (nothing here resolves).
+controls() {
+	local name="$1" file="$2" body="$3" reason="$4"
+	printf '%b' "$body" >"$scratch/canon/$file"
+	if check; then rm -f "$scratch/canon/$file"; echo "error: accepted $name" >&2; exit 1; fi
+	grep -q -- "$reason" "$scratch/out" || { echo "error: $name refused for another reason" >&2; cat "$scratch/out" >&2; exit 1; }
+	rm -f "$scratch/canon/$file"
+}
+controls 'a test-only import' zz_probe_test.go 'package canon\n\nimport _ "golang.org/x/crypto/sha3"\n' 'go list failed under GOOS=linux GOARCH=amd64 CGO_ENABLED=0'
+controls 'a windows-tagged import' zz_win.go '//go:build windows\n\npackage canon\n\nimport _ "golang.org/x/sys/windows"\n' 'go list failed under GOOS=windows'
+controls 'an arm64-tagged import' zz_tagged.go '//go:build arm64\n\npackage canon\n\nimport _ "golang.org/x/sys/cpu"\n' 'GOARCH=arm64'
+controls 'a cgo-only import' zz_cgo.go 'package canon\n\n// #include <stdio.h>\nimport "C"\nimport _ "golang.org/x/sys/unix"\n' 'CGO_ENABLED=1'
+# cgo itself, with no non-standard import, is refused: the module is cgo-free.
+controls 'import "C" behind a cgo tag' zz_cgo2.go '//go:build cgo\n\npackage canon\n\n// #include <stdio.h>\nimport "C"\n' 'uses cgo (import "C")'
 check || { cat "$scratch/out" >&2; echo 'error: pristine Go tree refused after controls' >&2; exit 1; }
-echo '[ok] leaf-dependency guard: comments, dev/build/target tables and aliases, renames, separators, unreadable graph, Go require, failed go list, imports and look-alike paths'
+echo '[ok] leaf-dependency guard: comments, dev/build/target tables and aliases, renames, separators, unreadable graph, Go require, failed go list, imports, look-alike paths, test-only, platform-tagged and cgo imports, and cgo itself'

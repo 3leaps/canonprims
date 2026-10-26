@@ -57,13 +57,34 @@ if grep -nE '^[[:space:]]*(require|replace)\b' go.mod; then
   echo "deps-check: go.mod must have no require or replace directives" >&2
   fail=1
 fi
-# A failed go list (an unresolvable import, a broken module) is a refusal, not
-# an empty result.
-if ! go_deps="$(GOWORK=off go list -deps -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./...)"; then
-  echo "deps-check: go list failed; the Go dependency graph could not be read" >&2
-  fail=1
-elif [ -n "$(printf '%s\n' "$go_deps" | grep -Ev '^(github.com/3leaps/canonprims(/.*)?)?$' || true)" ]; then
-  echo "deps-check: the Go module imports a non-standard package" >&2
-  fail=1
-fi
+# The Go module is standard library only on every platform CI builds, with
+# and without cgo, and including test files: each cell lists the full import
+# graph with -test, and a failed go list (an unresolvable import, a broken
+# module, an import "C" when cgo is off) is a refusal, never an empty result.
+# Only the module's own packages and their test variants may be non-standard.
+own='github.com/3leaps/canonprims(/[A-Za-z0-9_./-]*)?'
+own_line="^${own}(\.test)?( \[${own}\.test\])?$"
+for platform in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
+  for cgo in 0 1; do
+    cell="GOOS=${platform%/*} GOARCH=${platform#*/} CGO_ENABLED=${cgo}"
+    if ! go_deps="$(env GOWORK=off GOFLAGS=-mod=readonly GOOS="${platform%/*}" GOARCH="${platform#*/}" CGO_ENABLED="${cgo}" \
+      go list -deps -test -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./... 2>&1)"; then
+      echo "deps-check: go list failed under ${cell}; the Go dependency graph could not be read" >&2
+      printf '%s\n' "$go_deps" | head -5 >&2
+      fail=1
+    elif [ -n "$(printf '%s\n' "$go_deps" | grep -Ev "${own_line}" | grep -v '^$' || true)" ]; then
+      echo "deps-check: the Go module imports a non-standard package under ${cell}" >&2
+      printf '%s\n' "$go_deps" | grep -Ev "${own_line}" | grep -v '^$' | head -5 >&2
+      fail=1
+    fi
+    # cgo-free: no package of the module uses import "C" in any cell.
+    if cgo_files="$(env GOWORK=off GOFLAGS=-mod=readonly GOOS="${platform%/*}" GOARCH="${platform#*/}" CGO_ENABLED="${cgo}" \
+      go list -test -f '{{if .CgoFiles}}{{.ImportPath}}: {{join .CgoFiles " "}}{{end}}' ./... 2>/dev/null)" &&
+      [ -n "$(printf '%s' "$cgo_files" | tr -d '[:space:]')" ]; then
+      echo "deps-check: the Go module uses cgo (import \"C\") under ${cell}" >&2
+      printf '%s\n' "$cgo_files" | grep -v '^$' | head -5 >&2
+      fail=1
+    fi
+  done
+done
 exit "${fail}"
