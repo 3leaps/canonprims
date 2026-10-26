@@ -26,7 +26,16 @@ differently in each (ryu-based in Rust, `strconv` with an exact `math/big`
 integer check in Go), and the corpus expectations are hand-derived and
 checked against ECMAScript and a separate Python checker.
 
-There is no TypeScript binding yet.
+### Packages
+
+| Language | Package | Status |
+| --- | --- | --- |
+| Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.0 |
+| Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.0 |
+| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation | planned |
+| Python | `canonprims` (PyPI), from the Rust implementation | planned |
+
+There is no TypeScript or Python binding yet.
 
 ## Status
 
@@ -44,6 +53,8 @@ sha256:...
 $ canon jcs --check fixture.json    # exit 0 only if already canonical
 $ canon info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
+$ canon version --extended
+{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.0"}
 ```
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:

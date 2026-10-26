@@ -1,0 +1,18 @@
+# .fulmen/repo.yaml: what this repo claims to be. Written against the draft
+# repository-classes standard; the repo-declaration schema is planned, and this
+# file follows it when it lands.
+schema: "contract:taxonomy/v0/repo-declaration.schema.json"
+class: prims
+profile: B              # locked parallel pure-Go and Rust implementations
+profile_status: locked  # both trees pass conformance/canonical-json/v0 byte for byte
+leaf: true              # depends on no other prim; scripts/deps-check.sh enforces it
+category: library
+env_prefix: CANONPRIMS_
+umbrella_prefix: null
+surfaces: [library, cli]
+bindings:
+  rust: shipped         # canonprims-core, canonprims-json (crates.io)
+  go: shipped           # github.com/3leaps/canonprims/canon
+  typescript: planned   # from the Rust implementation (napi-rs)
+  python: planned       # from the Rust implementation (PyO3/maturin)
+extensions: []
