@@ -3,5 +3,5 @@
 # the gate.
 #
 # RFC 8785 checker from https://github.com/3leaps/crucible
-# commit 16e6abcb1ee498da60e98f0712a29087ba55bbee, scripts/rfc8785-canonicalize.py (tag v0.2.1)
+# commit 2e65eab5a9e71018405cb084c9999d893df38df2, scripts/rfc8785-canonicalize.py (tag v0.2.2)
 b3121736b69544c354164041818f007727e32326bbc6d01180dd8a907e044807  rfc8785-canonicalize.py
