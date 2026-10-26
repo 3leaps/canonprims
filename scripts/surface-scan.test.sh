@@ -101,7 +101,7 @@ chmod +x "$scratch/silent"
 refused 'report is missing or invalid' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/silent"
 # The canary block must be the canary entity's own: a block under another
 # replacement id does not prove the catalog's canary works.
-printf '#!/bin/sh\nprintf %%s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}]},"summary":{"findings_total":1},"findings":[{"decision":"block","replacement_id":"Codename","severity":"high"}]}'"'"'\nexit 1\n' >"$scratch/wrongblock"
+printf '#!/bin/sh\nprintf %%s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}],"files_skipped_by_reason":{},"directories_skipped":0},"summary":{"findings_total":1},"findings":[{"decision":"block","replacement_id":"Codename","severity":"high"}]}'"'"'\nexit 1\n' >"$scratch/wrongblock"
 chmod +x "$scratch/wrongblock"
 refused 'not blocked as CanonprimsCanary' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/wrongblock"
 # A scanner that works for the canary and the tree, then writes nothing for a
@@ -121,7 +121,7 @@ rm -f "$scratch/flaky.count"
 refused 'commit .*: limensafe report is missing or invalid' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/flaky"
 git -C "$repo" reset -q --hard HEAD~1
 # A scanner that reports clean on a canary it should block is caught.
-printf '#!/bin/sh\nprintf %s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}]},"summary":{"findings_total":0},"findings":[]}'"'"'\nexit 0\n' >"$scratch/blind"
+printf '#!/bin/sh\nprintf %s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}],"files_skipped_by_reason":{},"directories_skipped":0},"summary":{"findings_total":0},"findings":[]}'"'"'\nexit 0\n' >"$scratch/blind"
 chmod +x "$scratch/blind"
 refused 'did not block its canary' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/blind"
 # A term in each surface fails.
@@ -136,6 +136,40 @@ printf 'hidden.txt export-ignore\n' >"$repo/.gitattributes"
 git -C "$repo" add -A
 git -C "$repo" commit -qm 'add hidden notes'
 refused '\[block\] tree' "${cat_ok[@]}"
+git -C "$repo" reset -q --hard HEAD~1
+# A committed file listed in a committed .gitignore or .limensafeignore is
+# still pushed, so it is scanned.
+for ignore_file in .gitignore .limensafeignore; do
+	printf 'notes %s\n' "$term" >"$repo/leak.txt"
+	printf 'leak.txt\n' >"$repo/$ignore_file"
+	git -C "$repo" add -f leak.txt "$ignore_file"
+	git -C "$repo" commit -qm "add $ignore_file"
+	refused '\[block\] tree' "${cat_ok[@]}"
+	git -C "$repo" reset -q --hard HEAD~1
+done
+# A committed text file larger than limensafe's default size cap is scanned.
+{ head -c 11000000 /dev/zero | tr '\0' 'a'; printf '\nnotes %s\n' "$term"; } >"$repo/big.txt"
+git -C "$repo" add big.txt
+git -C "$repo" commit -qm 'add a large file'
+refused '\[block\] tree' "${cat_ok[@]}"
+git -C "$repo" reset -q --hard HEAD~1
+# A scanner that skips a file for any reason but binary content fails closed,
+# even a reason this script does not know. (These stubs block the canary as the
+# catalog would, so each run reaches the completeness check.)
+printf '#!/bin/sh\nprintf %%s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}],"files_skipped_by_reason":{"some_future_reason":1},"directories_skipped":0},"summary":{"findings_total":1},"findings":[{"decision":"block","replacement_id":"CanonprimsCanary","severity":"high"}]}'"'"'\nexit 1\n' >"$scratch/skipper"
+chmod +x "$scratch/skipper"
+refused 'files were skipped, not scanned: some_future_reason=1' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/skipper"
+printf '#!/bin/sh\nprintf %%s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}],"files_skipped_by_reason":{},"directories_skipped":2},"summary":{"findings_total":1},"findings":[{"decision":"block","replacement_id":"CanonprimsCanary","severity":"high"}]}'"'"'\nexit 1\n' >"$scratch/dirskipper"
+chmod +x "$scratch/dirskipper"
+refused 'directories were skipped' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/dirskipper"
+printf '#!/bin/sh\nprintf %%s '"'"'{"scan_metadata":{"catalogs_loaded":[{"catalog_id":"canonprims-release","load_status":"ok"}]},"summary":{"findings_total":1},"findings":[{"decision":"block","replacement_id":"CanonprimsCanary","severity":"high"}]}'"'"'\nexit 1\n' >"$scratch/noaccount"
+chmod +x "$scratch/noaccount"
+refused 'does not account for skipped files' "${cat_ok[@]}" CANONPRIMS_LIMENSAFE_BIN="$scratch/noaccount"
+# A committed binary file is skipped as binary, which is allowed.
+printf 'bin\0ary\n' >"$repo/blob.bin"
+git -C "$repo" add blob.bin
+git -C "$repo" commit -qm 'add a binary'
+passes "${cat_ok[@]}"
 git -C "$repo" reset -q --hard HEAD~1
 # A committed symlink's target text is scanned.
 ln -s "/opt/$term/x" "$repo/link"
@@ -172,4 +206,4 @@ passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_PR_T
 passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_SCOPE=release
 # A missing base is an error, not an empty commit range.
 refused 'base no-such-ref not found' "${cat_ok[@]}" CANONPRIMS_SURFACE_BASE=no-such-ref
-echo '[ok] surface-scan: catalog location (path, case, hard link), canary and vocabulary, scanner errors, each surface incl. export-ignore, symlinks and local edits, required PR text'
+echo '[ok] surface-scan: catalog location (path, case, hard link), canary and vocabulary, scanner errors, each surface incl. export-ignore, ignore files, oversize files, symlinks and local edits, skip accounting, required PR text'

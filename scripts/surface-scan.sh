@@ -75,7 +75,10 @@ scan() {
 	# The redirect below truncates the report too; removing it first keeps a
 	# stale report from surviving any change to how the scan is invoked.
 	rm -f "$work/report.json"
-	"$bin" scan "$@" --catalog "$catalog" --mode release >"$work/report.json" 2>"$work/scan.err" || rc=$?
+	# Every committed file is public once pushed, so no file is skipped for being
+	# listed in a .gitignore or .limensafeignore, or for its size.
+	"$bin" scan "$@" --catalog "$catalog" --mode release --include-ignored --max-file-size 4294967296 \
+		>"$work/report.json" 2>"$work/scan.err" || rc=$?
 	[[ "$rc" -le 1 ]] || {
 		grep -v '^catalog warning: ' "$work/scan.err" | head -3 >&3 || true
 		die "$label: limensafe exited $rc"
@@ -97,6 +100,17 @@ if loaded.get(catalog_id) != "ok":
     fail(f"error: {label}: catalog {catalog_id} did not load")
 if (total > 0) != (rc == 1):
     fail(f"error: {label}: exit status {rc} disagrees with {total} finding(s)")
+# Completeness: a skipped file or directory was not scanned. Only binary files
+# may be skipped; any other reason, including one a later limensafe adds, fails.
+meta = d.get("scan_metadata", {})
+skipped = meta.get("files_skipped_by_reason")
+if not isinstance(skipped, dict):
+    fail(f"error: {label}: limensafe report does not account for skipped files")
+other = {k: v for k, v in skipped.items() if k != "binary_detected" and v}
+if other:
+    fail(f"error: {label}: files were skipped, not scanned: " + ", ".join(f"{k}={v}" for k, v in sorted(other.items())))
+if meta.get("directories_skipped"):
+    fail(f"error: {label}: directories were skipped, not scanned: {meta.get('directories_skipped')}")
 for f in d.get("findings", []):
     loc = f.get("location", {})
     print(f"  {f.get('severity', '?')} {f.get('entity_class', '?')} {loc.get('path', '-')}:{loc.get('line', '-')}", file=sys.stderr)
