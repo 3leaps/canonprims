@@ -77,13 +77,28 @@ cp "$scratch/catalog.yaml" "$scratch/linked.yaml"
 ln "$scratch/linked.yaml" "$repo/linked-inside.yaml"
 refused 'hard link' LIMENSAFE_CATALOG_PATH="$scratch/linked.yaml"
 rm -f "$repo/linked-inside.yaml"
-# The repository spelled in another letter case, where the volume ignores case.
+# The repository spelled in another letter case, where the volume ignores case,
+# including a catalog name with no letters to change (identity, not spelling).
 cp "$scratch/catalog.yaml" "$repo/inside.yaml"
+cp "$scratch/catalog.yaml" "$repo/123"
 upper="$(dirname "$repo")/$(basename "$repo" | tr '[:lower:]' '[:upper:]')"
 if [[ -e "$upper/inside.yaml" ]]; then
 	refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$upper/inside.yaml"
+	refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$upper/123"
+	case_checked=1
 fi
-rm -f "$repo/inside.yaml"
+rm -f "$repo/inside.yaml" "$repo/123"
+# A symlink inside the repository that points at a catalog outside it is
+# refused: the path the maintainer names lies in the repository.
+cp "$scratch/catalog.yaml" "$scratch/outside.yaml"
+ln -s "$scratch/outside.yaml" "$repo/link-to-outside.yaml"
+refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$repo/link-to-outside.yaml"
+rm -f "$repo/link-to-outside.yaml"
+# A ".." route back into the repository is refused.
+mkdir -p "$repo/sub"
+cp "$scratch/catalog.yaml" "$repo/inside.yaml"
+refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$repo/sub/../inside.yaml"
+rm -rf "$repo/sub" "$repo/inside.yaml"
 git -C "$repo" worktree add -q --detach "$scratch/wt" HEAD
 cp "$scratch/catalog.yaml" "$scratch/wt/inside.yaml"
 refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$scratch/wt/inside.yaml"
@@ -206,4 +221,5 @@ passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_PR_T
 passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_SCOPE=release
 # A missing base is an error, not an empty commit range.
 refused 'base no-such-ref not found' "${cat_ok[@]}" CANONPRIMS_SURFACE_BASE=no-such-ref
-echo '[ok] surface-scan: catalog location (path, case, hard link), canary and vocabulary, scanner errors, each surface incl. export-ignore, ignore files, oversize files, symlinks and local edits, skip accounting, required PR text'
+[[ "$(uname -s)" != Darwin || "${case_checked:-0}" == 1 ]] || { echo 'error: the case-alias controls did not run on macOS' >&2; exit 1; }
+echo '[ok] surface-scan: catalog location (path, case incl. numeric names, .., hard link), canary and vocabulary, scanner errors, each surface incl. export-ignore, ignore files, oversize files, symlinks and local edits, skip accounting, required PR text'
