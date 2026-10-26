@@ -14,8 +14,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   (`github.com/3leaps/canonprims/canon`), with the same refusal codes and explicit limits
 - `canon` command: `canon jcs [--check] [--digest] FILE|-`, `canon info` and
   `canon version [--extended]`
-- Conformance corpus `canonical-json/v0`, witnessed against ECMAScript and a
-  separate Python checker
+- Conformance corpus `canonical-json/v0`, whose file-based accept cases are
+  witnessed against ECMAScript and a separate Python checker
 - Rust/Go byte-for-byte agreement gate on the corpus and on generated input
 - Release process: one signed tag per release (`vX.Y.Z`) for the Rust crates
   and the root Go module, committed public signing pins and
