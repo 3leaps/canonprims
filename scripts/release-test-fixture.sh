@@ -75,15 +75,15 @@ PY
 }
 
 # fixture_repo <dir> <version>
-# A git repo carrying the release scripts, VERSION, tag config and the go/canon
+# A git repo carrying the release scripts, VERSION, tag config and the root Go
 # module marker, with a fake origin so the scripts' origin checks pass.
 fixture_repo() {
 	local repo="$1" version="$2"
-	mkdir -p "$repo/scripts" "$repo/config/release" "$repo/docs/security" "$repo/keys" "$repo/go/canon"
+	mkdir -p "$repo/scripts" "$repo/config/release" "$repo/docs/security" "$repo/keys"
 	cp "$fixture_root"/scripts/{release-workflow-pin.py,release-tag-common.sh,release-decernor.sh,release-prepare-tag-message.py,release-tag-body.sh,verify-pinned-tag.sh,validate-release-anchors.sh,release-insert-anchors.sh,install-release-anchors.sh,release-validate-pin.sh,verify-public-keys.sh} "$repo/scripts/"
 	cp "$fixture_root"/config/release/tagger-identity.txt "$repo/config/release/"
 	printf '%s\n' "$version" >"$repo/VERSION"
-	printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go/canon/go.mod"
+	printf 'module github.com/3leaps/canonprims\n' >"$repo/go.mod"
 	fixture_workflow_pin "$repo"
 	git -C "$repo" init -q -b main
 	git -C "$repo" config user.name fixture

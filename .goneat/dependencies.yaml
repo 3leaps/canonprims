@@ -61,4 +61,4 @@ languages:
       - crates/canonprims-cli/Cargo.toml
   - language: go
     paths:
-      - go/canon/go.mod
+      - go.mod

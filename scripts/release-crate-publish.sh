@@ -130,7 +130,7 @@ if indexed "$crate"; then
 fi
 verified="$("$root/scripts/release-crate-record.py" check "$records/$crate.identity.json" "$records/$crate-$version.crate" \
 	--tag "$(release_tag)" --object "$CANONPRIMS_EXPECTED_TAG_OBJECT" \
-	--module-object "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" --commit "$commit" \
+	--commit "$commit" \
 	--crate "$crate" --version "$version" --registry "$registry_name")" || die "the CI verification record for $crate does not match this release"
 
 # 2. Package without compiling; it must be the CI-verified archive.

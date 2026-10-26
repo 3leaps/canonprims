@@ -51,16 +51,16 @@ surface-check: ## Run the maintainer's public-surface check, when CANONPRIMS_SUR
 
 fmt: ## Format Rust and Go
 	$(CARGO) fmt --all
-	cd go/canon && gofmt -w .
+	gofmt -w canon
 
 fmt-check: ## Check formatting
 	$(CARGO) fmt --all -- --check
-	@out="$$(cd go/canon && gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt: $$out"; exit 1; fi
+	@out="$$(gofmt -l canon)"; if [ -n "$$out" ]; then echo "gofmt: $$out"; exit 1; fi
 	@echo "[ok] fmt-check"
 
 lint: ## clippy and go vet
 	$(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
-	cd go/canon && $(GOENV) $(GO) vet ./...
+	$(GOENV) $(GO) vet ./...
 	@echo "[ok] lint"
 
 test: test-rust test-go ## Rust and Go tests
@@ -69,7 +69,7 @@ test-rust: ## Rust tests
 	$(CARGO) test --workspace --all-features --locked
 
 test-go: ## Go tests (standard library only, no cgo)
-	cd go/canon && $(GOENV) $(GO) test -count=1 ./...
+	$(GOENV) $(GO) test -count=1 ./...
 
 msrv-check: ## Rust tests at the MSRV
 	$(CARGO) +$(MSRV) test --workspace --all-features --locked
@@ -120,8 +120,8 @@ clean: ## Remove build output
 # Release (crucible PDR-0008)
 # -----------------------------------------------------------------------------
 #
-# A release is two signed annotated tags at one commit of main: vX.Y.Z and
-# go/canon/vX.Y.Z. The tag is an explicit input (CANONPRIMS_RELEASE_TAG); it is
+# A release is one signed annotated tag, vX.Y.Z, at a commit of main; it
+# releases the Rust crates and the root Go module together. The tag is an explicit input (CANONPRIMS_RELEASE_TAG); it is
 # never derived from VERSION, git describe or the branch, and a bare
 # RELEASE_TAG from any origin is refused so it cannot stand in for it.
 #

@@ -27,7 +27,6 @@ SBOM_IMAGE = "ghcr.io/fulmenhq/sbom-tools@sha256:954267f9aca809b89af42bb97471a3c
 MANDATORY = (
     '(cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")',
     "./scripts/release-restore-tag-ref.sh",
-    'git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"',
     "./scripts/release-validate-pin.sh",
     "./scripts/verify-pinned-tag.sh",
     "python3 -I scripts/release-source-check.py",

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# The release tag set verifies only against the pin committed in the tagged
-# commit, and only when every tag is annotated, signed by the committed signing
-# subkey and points at one commit.
+# The release tag verifies only against the pin committed in the tagged commit,
+# and only when it is annotated, signed by the committed signing subkey and
+# points at the release commit.
 set -euo pipefail
 # shellcheck disable=SC2119 # verify is called with and without --published.
 # shellcheck source=scripts/release-test-fixture.sh
@@ -24,7 +24,7 @@ CANONPRIMS_DECERNOR_BIN="$decernor" "$repo/scripts/release-insert-anchors.sh" >/
 [[ "$(awk '$1=="gpg" {print $2}' "$repo/keys/expected-fingerprints.txt")" == "$primary" ]]
 fixture_commit "$repo" anchors
 
-tags=("v$version" "go/canon/v$version")
+tags=("v$version")
 fixture_messages "$messages" "$version" "${tags[@]}"
 sign() {
 	local home="$1" key="$2" tag="$3" target="${4:-HEAD}"
@@ -38,19 +38,15 @@ verify() {
 	(cd "$repo" && CANONPRIMS_RELEASE_TAG="v$version" RELEASE_DECERNOR_BIN="$decernor" ./scripts/verify-pinned-tag.sh "$@")
 }
 out="$(verify)"
-[[ "$out" == *"2 signed tag(s) verified"* ]]
+[[ "$out" == *"1 signed tag(s) verified"* ]]
 
 retag() { git -C "$repo" tag -d "$1" >/dev/null; }
 
 # A tag that points at a different commit fails, even though it is validly signed.
+release_commit="$(git -C "$repo" rev-parse HEAD)"
 git -C "$repo" commit -q --allow-empty -m later
-retag "go/canon/v$version"
-sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version" HEAD
 expect_fail_with 'tag must point at HEAD' verify
-expect_fail_with "go/canon/v$version does not point at the release commit" verify --published
-retag "go/canon/v$version"
-sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version" "v$version^{commit}"
-git -C "$repo" reset -q --hard "v$version^{commit}"
+git -C "$repo" reset -q --hard "$release_commit"
 verify >/dev/null
 
 # Only refs/tags is read by default: preserved good tags in a private
@@ -85,20 +81,28 @@ for tag in "${tags[@]}"; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
 verify >/dev/null
 
 # A lightweight tag fails.
-retag "go/canon/v$version"
-git -C "$repo" tag "go/canon/v$version"
+retag "v$version"
+git -C "$repo" tag "v$version"
 expect_fail_with 'must be an annotated tag' verify
-retag "go/canon/v$version"
-sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version"
+retag "v$version"
+sign "$fixture_dir/gpg" "$subkey" "v$version"
 verify >/dev/null
 
 # A tag signed by a key that is not the committed subkey fails.
-retag "go/canon/v$version"
-sign "$fixture_dir/gpg-other" "$other_subkey" "go/canon/v$version"
+retag "v$version"
+sign "$fixture_dir/gpg-other" "$other_subkey" "v$version"
 expect_fail_with 'signature is invalid under the pin|not signed by the committed signing subkey' verify
-retag "go/canon/v$version"
-sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version"
+retag "v$version"
+sign "$fixture_dir/gpg" "$subkey" "v$version"
 verify >/dev/null
+
+# A leftover path-prefixed module tag from the two-tag layout is not part of
+# the release: it is neither required nor counted.
+fixture_messages "$messages" "$version" "go/canon/v$version"
+sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version"
+out="$(verify)"
+[[ "$out" == *"1 signed tag(s) verified"* ]]
+retag "go/canon/v$version"
 
 # A wrong tagger fails.
 retag "v$version"
@@ -109,10 +113,10 @@ retag "v$version"
 sign "$fixture_dir/gpg" "$subkey" "v$version"
 verify >/dev/null
 
-# A missing tag from the set fails.
-retag "go/canon/v$version"
-expect_fail_with "go/canon/v$version is absent" verify
-sign "$fixture_dir/gpg" "$subkey" "go/canon/v$version"
+# A missing release tag fails.
+retag "v$version"
+expect_fail_with "v$version is absent" verify
+sign "$fixture_dir/gpg" "$subkey" "v$version"
 verify >/dev/null
 
 # Working-tree edits to the pins are never consulted: replacing them with the
@@ -130,23 +134,32 @@ fixture_commit "$repo" wrong-subkey
 for tag in "${tags[@]}"; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
 expect_fail_with 'not signed by the committed signing subkey' verify
 
-# A tagged go/canon/go.mod declaring another module path is not a release.
+# A tagged root go.mod declaring another module path is not a release.
 git -C "$repo" tag -d "${tags[@]}" >/dev/null
 git -C "$repo" checkout -q -- .
 printf '%s\n' "$subkey" >"$repo/config/release/signing-subkey.txt"
-printf 'module example.com/other\n' >"$repo/go/canon/go.mod"
+printf 'module example.com/other\n' >"$repo/go.mod"
 fixture_commit "$repo" wrong-module
 for tag in "${tags[@]}"; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
-expect_fail_with 'must declare module github.com/3leaps/canonprims/go/canon' verify
-printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go/canon/go.mod"
+expect_fail_with 'must declare module github.com/3leaps/canonprims$' verify
+# The old nested module path is refused too: the module must be at the root.
+git -C "$repo" tag -d "${tags[@]}" >/dev/null
+printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go.mod"
+fixture_commit "$repo" nested-module-path
+for tag in "${tags[@]}"; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
+expect_fail_with 'must declare module github.com/3leaps/canonprims$' verify
+printf 'module github.com/3leaps/canonprims\n' >"$repo/go.mod"
 fixture_commit "$repo" right-module
 
-# A tagged tree without the go/canon module is not a release.
+# A tagged tree without the root Go module is not a release, even if it
+# carries the module in the old nested place.
 git -C "$repo" tag -d "${tags[@]}" >/dev/null
 printf '%s\n' "$subkey" >"$repo/config/release/signing-subkey.txt"
-git -C "$repo" rm -rq go/canon
+git -C "$repo" rm -q go.mod
+mkdir -p "$repo/go/canon"
+printf 'module github.com/3leaps/canonprims/go/canon\n' >"$repo/go/canon/go.mod"
 fixture_commit "$repo" no-go-module
 for tag in "${tags[@]}"; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
-expect_fail_with 'go/canon/go.mod is required' verify
+expect_fail_with 'go.mod is required at the root' verify
 [[ "$other_primary" != "$primary" ]]
 echo '[ok] verify-pinned-tag controls passed'

@@ -1,6 +1,6 @@
 # canonprims read-only release artifacts
 #
-# On a v* tag: verify both release tags (vX.Y.Z and go/canon/vX.Y.Z) against
+# On a v* tag: verify the release tag (vX.Y.Z) against
 # the public pin committed in the tagged commit, check the committed anchors
 # with the digest-pinned checker, then build the canon CLI on the five native
 # cells and an SBOM, and keep them as workflow artifacts.
@@ -57,15 +57,13 @@ jobs:
           tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
           echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
 
-      - name: Restore both annotated tags and verify them against the committed pin
+      - name: Restore the annotated tag and verify it against the committed pin
         id: identity
         env:
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           ./scripts/release-restore-tag-ref.sh
-          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
-          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
           source scripts/release-decernor.sh
           resolve_release_decernor
           export RELEASE_DECERNOR_BIN
@@ -81,9 +79,8 @@ jobs:
             echo "object=$object"
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
-          module_object="$(git rev-parse "refs/tags/$module_tag")"
-          printf '{"tag":"%s","object":"%s","module_object":"%s","commit":"%s"}\n' \
-            "$CANONPRIMS_RELEASE_TAG" "$object" "$module_object" "$commit" > release-identity.json
+          printf '{"tag":"%s","object":"%s","commit":"%s"}\n' \
+            "$CANONPRIMS_RELEASE_TAG" "$object" "$commit" > release-identity.json
 
       - name: Upload artifact identity and licenses
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -253,8 +250,6 @@ jobs:
         run: |
           set -euo pipefail
           ./scripts/release-restore-tag-ref.sh
-          module_tag="go/canon/$CANONPRIMS_RELEASE_TAG"
-          git fetch --quiet --no-tags origin "+refs/tags/$module_tag:refs/tags/$module_tag"
           test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
       - name: Install Rust

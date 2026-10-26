@@ -9,16 +9,16 @@ scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 printf 'archive bytes' >"$scratch/a.crate"
 digest="$(shasum -a 256 "$scratch/a.crate" | cut -c1-64)"
-o=1111111111111111111111111111111111111111 m=3333333333333333333333333333333333333333 c=2222222222222222222222222222222222222222
-python3 -I - "$scratch/r.json" "$digest" "$o" "$m" "$c" <<'PY'
+o=1111111111111111111111111111111111111111 c=2222222222222222222222222222222222222222
+python3 -I - "$scratch/r.json" "$digest" "$o" "$c" <<'PY'
 import json, sys
 json.dump({"format": "canonprims-crate-verification/v0", "repository": "3leaps/canonprims", "tag": "v1.2.3",
-           "object": sys.argv[3], "module_object": sys.argv[4], "commit": sys.argv[5], "crate": "canonprims-core",
+           "object": sys.argv[3], "commit": sys.argv[4], "crate": "canonprims-core",
            "version": "1.2.3", "cargo": "cargo 1.88.0", "registry": "crates-io", "sha256": sys.argv[2],
            "run_id": "7", "run_attempt": "1"}, open(sys.argv[1], "w"))
 PY
 check() {
-	python3 -I "$root/scripts/release-crate-record.py" check "$1" "$2" --tag v1.2.3 --object "$o" --module-object "$m" \
+	python3 -I "$root/scripts/release-crate-record.py" check "$1" "$2" --tag v1.2.3 --object "$o" \
 		--commit "$c" --crate canonprims-core --version 1.2.3 --registry crates-io >"$scratch/out" 2>&1
 }
 check "$scratch/r.json" "$scratch/a.crate"
@@ -49,4 +49,7 @@ printf 'x' >>"$scratch/b.crate"
 refused 'does not have the recorded digest' "$scratch/r.json" "$scratch/b.crate"
 python3 -I -c 'import json,sys; r=json.load(open(sys.argv[1])); r["commit"]="0"*40; json.dump(r,open(sys.argv[2],"w"))' "$scratch/r.json" "$scratch/r2.json"
 refused 'commit differs from this release' "$scratch/r2.json" "$scratch/a.crate"
+# A record from the two-tag layout (an extra module_object field) is malformed.
+python3 -I -c 'import json,sys; r=json.load(open(sys.argv[1])); r["module_object"]=r["object"]; json.dump(r,open(sys.argv[2],"w"))' "$scratch/r.json" "$scratch/r3.json"
+refused 'malformed crate verification record' "$scratch/r3.json" "$scratch/a.crate"
 echo '[ok] crate verification record: identity, digest, and regular-file inputs'

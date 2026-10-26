@@ -189,17 +189,19 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false
 
-      - name: go/canon outside the repository
+      - name: Go module outside the repository
         env:
           GOWORK: "off"
           CGO_ENABLED: "0"
         run: |
           corpus="$PWD/conformance/canonical-json/v0"
-          standalone="$(mktemp -d)/canon"
-          cp -R go/canon "$standalone"
+          standalone="$(mktemp -d)/canonprims"
+          mkdir "$standalone"
+          cp go.mod "$standalone/"
+          cp -R canon "$standalone/canon"
           cd "$standalone"
-          CANON_CORPUS_DIR="$corpus" go test -count=1 -v ./... | tee "$RUNNER_TEMP/go-standalone.log"
+          CANONPRIMS_CORPUS_DIR="$corpus" go test -count=1 -v ./... | tee "$RUNNER_TEMP/go-standalone.log"
           if grep -q -- '--- SKIP' "$RUNNER_TEMP/go-standalone.log"; then
-            echo "standalone go/canon tests must not skip" >&2
+            echo "standalone Go tests must not skip" >&2
             exit 1
           fi

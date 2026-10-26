@@ -28,7 +28,7 @@ earlier is not necessarily the one uploaded.
    as consumers will. Neither holds a registry credential or a persisted
    checkout credential.
 2. **Evidence is bound to the exact archive.** The verification record names
-   the repository, both tag objects, the commit, the run and attempt, the
+   the repository, the tag object, the commit, the run and attempt, the
    Cargo version, the crate, version, registry, and the SHA-256 of the archive
    that was verified, hashed before anything could repackage it. The
    maintainer fetches it from an exactly selected successful run of the right

@@ -40,12 +40,12 @@ expected asset set.
 
 ## Tags
 
-A release tags one commit with two names at the same version: `vX.Y.Z` and
-`go/canon/vX.Y.Z`, the path-prefixed tag Go requires for the `go/canon` module
-(see [ADR-0001](../decisions/ADR-0001-release-identity-and-tags.md)). Both must
-be annotated, signed by the committed signing subkey, and point at that one
-commit. Verification refuses a release where either tag is missing or points
-elsewhere. The GitHub release is bound to `vX.Y.Z`.
+A release is one tag, `vX.Y.Z`, which releases the Rust crates and the root Go
+module together (see [ADR-0001](../decisions/ADR-0001-release-identity-and-tags.md)).
+It must be annotated, signed by the committed signing subkey, and point at a
+commit whose root `go.mod` declares `github.com/3leaps/canonprims`.
+Verification refuses a release where the tag is missing or points elsewhere.
+The GitHub release is bound to `vX.Y.Z`.
 
 Tag verification reads committed public data in an isolated keyring and
 requires the exact signing subkey. The forge's own "verified" flag is an
@@ -63,7 +63,7 @@ change is always a reviewed change to a trust file.
 The publication ceremony compiles nothing; package verification is compiled
 in credential-free CI. A crate's package is
 verified there (`cargo package`, which builds it) and the SHA-256 of the
-verified archive is recorded with both tag objects, the commit and the run.
+verified archive is recorded with the tag object, the commit and the run.
 The maintainer packages the same source with `cargo package --no-verify` in a
 fresh Cargo home and must reproduce that archive byte for byte. The upload
 runs `cargo publish --no-verify` with `scripts/release-cargo-provider.py` as

@@ -56,12 +56,11 @@ chmod +x "$repo/bin/cargo"
 git -C "$repo" add -A
 git -C "$repo" commit -qm release
 git -C "$repo" tag -a -m "Release $version" "$tag"
-git -C "$repo" tag -a -m "go/canon/$tag" "go/canon/$tag"
 commit="$(git -C "$repo" rev-parse HEAD)"
 cp -p "$fixture_dir/trusted/"* "$repo/scripts/"
 git -C "$repo" commit -qam 'trusted operator scripts'
-printf 'tag=%s\nobject=%s\nmodule_object=%s\ncommit=%s\n' "$tag" \
-	"$(git -C "$repo" rev-parse "refs/tags/$tag")" "$(git -C "$repo" rev-parse "refs/tags/go/canon/$tag")" "$commit" \
+printf 'tag=%s\nobject=%s\ncommit=%s\n' "$tag" \
+	"$(git -C "$repo" rev-parse "refs/tags/$tag")" "$commit" \
 	>"$fixture_dir/ceremony.anchor"
 export CANONPRIMS_RELEASE_TAG="$tag" CANONPRIMS_RELEASE_ANCHOR_FILE="$fixture_dir/ceremony.anchor"
 export CANONPRIMS_INDEX_WAIT_TRIES=20 CANONPRIMS_INDEX_WAIT_SECONDS=0.5

@@ -44,10 +44,10 @@ type corpusIndex struct {
 }
 
 func corpusDir() string {
-	if d := os.Getenv("CANON_CORPUS_DIR"); d != "" {
+	if d := os.Getenv("CANONPRIMS_CORPUS_DIR"); d != "" {
 		return d
 	}
-	return filepath.Join("..", "..", "conformance", "canonical-json", "v0")
+	return filepath.Join("..", "conformance", "canonical-json", "v0")
 }
 
 func loadCorpus(t testing.TB) (string, *corpusIndex) {
@@ -58,7 +58,7 @@ func loadCorpus(t testing.TB) (string, *corpusIndex) {
 		if testing.Short() {
 			t.Skipf("corpus not found at %s: %v", dir, err)
 		}
-		t.Fatalf("corpus not found at %s (set CANON_CORPUS_DIR): %v", dir, err)
+		t.Fatalf("corpus not found at %s (set CANONPRIMS_CORPUS_DIR): %v", dir, err)
 	}
 	var idx corpusIndex
 	if err := json.Unmarshal(raw, &idx); err != nil {
@@ -179,9 +179,9 @@ func TestCorpus(t *testing.T) {
 			t.Errorf("%s: Check(non-canonical input) = %v, want not_canonical", c.ID, cerr)
 		}
 	}
-	if path := os.Getenv("CANON_RESULTS_OUT"); path != "" {
+	if path := os.Getenv("CANONPRIMS_RESULTS_OUT"); path != "" {
 		if err := os.WriteFile(path, []byte(results.String()), 0o644); err != nil {
-			t.Fatalf("CANON_RESULTS_OUT: %v", err)
+			t.Fatalf("CANONPRIMS_RESULTS_OUT: %v", err)
 		}
 	}
 }

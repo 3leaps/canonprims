@@ -1,20 +1,21 @@
 ---
 id: "ADR-0001"
-title: "Release identity: two signed tags at one commit, committed public pins"
+title: "Release identity: one signed tag, committed public pins"
 status: "accepted"
 date: "2026-10-23"
+revised: "2026-10-25"
 ---
 
-# ADR-0001: Release Identity: Two Signed Tags at One Commit, Committed Public Pins
+# ADR-0001: Release Identity: One Signed Tag, Committed Public Pins
 
 ## Context
 
 canonprims ships two independent implementations of one scheme from one
-repository: Rust crates published to crates.io, and a pure-Go module at
-`go/canon` (`github.com/3leaps/canonprims/go/canon`). Go resolves a module in
-a subdirectory only from a tag prefixed with that directory, so the Go module
-needs its own tag. Both implementations are versioned together and released
-from the same commit.
+repository: Rust crates published to crates.io, and a pure-Go package in the
+root Go module (`github.com/3leaps/canonprims`, package `canon`). Both are
+versioned together and released from the same commit. Because the Go module is
+at the repository root, Go resolves it from the plain `vX.Y.Z` tag; a module in
+a subdirectory would need a second, path-prefixed tag.
 
 The release process follows crucible PDR-0008: public pins are committed and
 read from the tagged commit, one checker derives and verifies the fingerprint
@@ -23,14 +24,15 @@ fallback.
 
 ## Decision
 
-1. **One version, two tags, one commit.** A release `X.Y.Z` is the annotated
-   tags `vX.Y.Z` and `go/canon/vX.Y.Z`, both signed by the committed signing
-   subkey and both pointing at the same commit of `main`. The tag set is
-   fixed in the release scripts, not configuration, so nothing in a checkout
-   can narrow it; verification requires exactly these two tags. A tree without
-   `go/canon/go.mod` cannot be released, and verification refuses a release
-   where either tag is missing, unsigned, lightweight, or points at another
-   commit. Tags are created locally and pushed in one atomic push.
+1. **One version, one tag.** A release `X.Y.Z` is the annotated tag
+   `vX.Y.Z`, signed by the committed signing subkey and pointing at a commit
+   of `main`. It releases the Rust crates and the Go module together. The tag
+   set is fixed in the release scripts, not configuration, so nothing in a
+   checkout can change it; verification requires exactly this one tag. A tree
+   whose root `go.mod` is missing or declares another module path cannot be
+   released, and verification refuses a tag that is missing, unsigned,
+   lightweight, or points at another commit. The tag is created locally and
+   then pushed.
 2. **One GitHub release**, bound to `vX.Y.Z`. Its assets are the `canon` CLI
    archives for linux amd64/arm64, darwin arm64 and windows amd64/arm64, the
    source archive (`git archive` of the tagged commit, rebuilt and compared
@@ -53,7 +55,7 @@ fallback.
    step derives a tag from `VERSION`, `git describe` or the branch. The checker
    comes only from the absolute path in `CANONPRIMS_DECERNOR_BIN` (decernor
    0.1.8 or newer), with no `PATH` or unprefixed fallback.
-5. **Read-only CI.** The tag workflow verifies both tags against the committed
+5. **Read-only CI.** The tag workflow verifies the tag against the committed
    pin, validates the committed anchors with a digest-pinned checker, and
    builds artifacts. It holds no write, signing or registry authority. The
    maintainer creates the draft, signs the manifests and publishes locally.
@@ -62,7 +64,13 @@ fallback.
 
 - The Go module and the Rust crates always carry the same version, including
   for a release where only one of them changed.
-- A Go consumer resolving `go/canon@vX.Y.Z` gets the commit the Rust crates
-  were published from.
-- Adding another module with its own tag is a change to the tag set,
-  this record, and the verification tests together.
+- A Go consumer resolving `github.com/3leaps/canonprims@vX.Y.Z` gets the
+  commit the Rust crates were published from.
+- Adding a nested Go module, which would need its own tag, is a change to the
+  tag set, this record, and the verification tests together.
+
+## Revision (2026-10-25)
+
+Before any release, the Go module moved from `go/canon` to the repository
+root and the release went from two tags (`vX.Y.Z` and `go/canon/vX.Y.Z`) to
+one. No release was made under the two-tag rule.

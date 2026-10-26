@@ -62,7 +62,6 @@ json.dump({
     "repository": "3leaps/canonprims",
     "tag": "$tag",
     "object": "$(git rev-parse "refs/tags/$tag")",
-    "module_object": "$(git rev-parse "refs/tags/go/canon/$tag")",
     "commit": "$commit",
     "crate": "$crate",
     "version": "$version",

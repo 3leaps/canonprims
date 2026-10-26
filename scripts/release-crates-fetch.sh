@@ -9,7 +9,7 @@
 # push run of release.yml; every later crate from a crates-verify.yml run
 # dispatched on the tag after its predecessors were published. The run must be
 # completed and successful for the tag at the anchored commit, the record must
-# name both anchored tag objects, the commit, this run and attempt, and the
+# name the anchored tag object, the commit, this run and attempt, and the
 # archive must have the recorded digest.
 set -euo pipefail
 die() {
@@ -42,8 +42,7 @@ load_ceremony_anchor || die 'the recorded ceremony anchor (CANONPRIMS_RELEASE_AN
 CANONPRIMS_ANCHOR_OUT="$scratch/anchor" "$root/scripts/release-verify-published-tag.sh"
 commit="$(awk -F= '$1=="commit" {print $2}' "$scratch/anchor")"
 object="$(awk -F= '$1=="object" {print $2}' "$scratch/anchor")"
-module_object="$(awk -F= '$1=="module_object" {print $2}' "$scratch/anchor")"
-[[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" && "$module_object" == "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" &&
+[[ "$object" == "$CANONPRIMS_EXPECTED_TAG_OBJECT" &&
 	"$commit" == "$CANONPRIMS_EXPECTED_COMMIT" ]] || die 'verified tags differ from the recorded ceremony anchor'
 runs="$(release_gh run list --repo "$CANONPRIMS_REPOSITORY" --workflow "$workflow" --branch "$tag" --limit 100 \
 	--json databaseId,headSha,conclusion,event \
@@ -73,7 +72,7 @@ done
 jq -e --arg run "$run" --arg attempt "$attempt" '.run_id == $run and .run_attempt == $attempt' \
 	"$scratch/download/$crate.identity.json" >/dev/null || die 'record names another run or attempt'
 python3 -I "$root/scripts/release-crate-record.py" check "$scratch/download/$crate.identity.json" "$scratch/download/$crate-$version.crate" \
-	--tag "$tag" --object "$object" --module-object "$module_object" --commit "$commit" \
+	--tag "$tag" --object "$object" --commit "$commit" \
 	--crate "$crate" --version "$version" --registry crates-io >"$scratch/digest" || die 'record does not match this release'
 cp "$scratch/download/$crate-$version.crate" "$scratch/download/$crate.identity.json" "$dest/"
 echo "[ok] fetched $crate $version verification from $workflow run $run attempt $attempt: sha256 $(cat "$scratch/digest")"

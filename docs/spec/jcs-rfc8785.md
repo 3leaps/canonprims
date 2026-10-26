@@ -223,7 +223,7 @@ line of the form:
     <id> ok <sha256 hex of the canonical output>
     <id> <refusal code>
 
-Under the environment variable `CANON_RESULTS_OUT=<path>`, the corpus test
+Under the environment variable `CANONPRIMS_RESULTS_OUT=<path>`, the corpus test
 writes these lines to `<path>`, LF-terminated, with no other content.
 
 **Differential driver.** The driver reads stdin one LF-terminated line at a

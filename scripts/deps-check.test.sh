@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # The leaf-dependency guard refuses another *prims crate or rsfulmen however
-# it is declared, and accepts the workspace's own crates.
+# it is declared, and accepts the workspace's own crates. The root Go module
+# must stay standard-library only.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
-git -C "$root" archive HEAD Cargo.toml Cargo.lock crates go | tar -x -C "$scratch"
+git -C "$root" archive HEAD Cargo.toml Cargo.lock crates go.mod canon | tar -x -C "$scratch"
 mkdir -p "$scratch/scripts"
 cp "$root/scripts/deps-check.sh" "$scratch/scripts/"
 manifest="$scratch/crates/canonprims-json/Cargo.toml"
@@ -58,4 +59,38 @@ grep -q 'appears in the resolved dependency graph' "$scratch/out" || { echo 'err
 printf '#!/bin/bash\nif [[ "$1" == metadata ]]; then echo %q; exit 0; fi\nexec %q "$@"\n' \
 	'{"packages":[{"name":"canonprims-core"},{"name":"serde"}]}' "$real_cargo" >"$scratch/bin/cargo"
 (cd "$scratch" && PATH="$scratch/bin:$PATH" scripts/deps-check.sh) >"$scratch/out" 2>&1 || { echo 'error: refused a clean graph' >&2; cat "$scratch/out" >&2; exit 1; }
-echo '[ok] leaf-dependency guard: comments, dev/build/target tables and aliases, renames, separators, unreadable graph'
+# Go: a require or replace directive in go.mod is refused, and so is any
+# non-standard import, while the module's own packages are accepted.
+cp "$scratch/go.mod" "$scratch/go.mod.orig"
+printf 'require example.com/other v1.0.0\n' >>"$scratch/go.mod"
+check && { echo 'error: accepted a go.mod require' >&2; exit 1; }
+grep -q 'go.mod must have no require or replace directives' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+cp "$scratch/go.mod.orig" "$scratch/go.mod"
+mkdir -p "$scratch/canon/internal/probe"
+# An import the module cannot resolve: go list fails, which is a refusal.
+printf 'package probe\n\nimport _ "example.com/other"\n' >"$scratch/canon/internal/probe/probe.go"
+check && { echo 'error: accepted an unresolvable Go import' >&2; exit 1; }
+grep -q 'go list failed' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+# A non-standard import that resolves (a stub go list reporting it): refused.
+mkdir -p "$scratch/gobin"
+real_go="$(command -v go)"
+# shellcheck disable=SC2016 # expands in the stub
+printf '#!/bin/bash\nif [[ "$1" == list ]]; then printf "%%s\\n" github.com/3leaps/canonprims/canon example.com/other; exit 0; fi\nexec %q "$@"\n' \
+	"$real_go" >"$scratch/gobin/go"
+chmod +x "$scratch/gobin/go"
+rm -rf "$scratch/canon/internal/probe"
+if (cd "$scratch" && PATH="$scratch/gobin:$PATH" scripts/deps-check.sh) >"$scratch/out" 2>&1; then
+	echo 'error: accepted a non-standard Go import' >&2
+	exit 1
+fi
+grep -q 'imports a non-standard package' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+# A look-alike module path is not the module's own.
+printf '#!/bin/bash\nif [[ "$1" == list ]]; then echo github.com/3leaps/canonprims-evil/x; exit 0; fi\nexec %q "$@"\n' \
+	"$real_go" >"$scratch/gobin/go"
+if (cd "$scratch" && PATH="$scratch/gobin:$PATH" scripts/deps-check.sh) >"$scratch/out" 2>&1; then
+	echo 'error: accepted a look-alike module path' >&2
+	exit 1
+fi
+grep -q 'imports a non-standard package' "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+check || { cat "$scratch/out" >&2; echo 'error: pristine Go tree refused after controls' >&2; exit 1; }
+echo '[ok] leaf-dependency guard: comments, dev/build/target tables and aliases, renames, separators, unreadable graph, Go require, failed go list, imports and look-alike paths'

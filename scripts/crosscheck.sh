@@ -31,8 +31,8 @@ run() {
   fi
 }
 status=0
-run rust env CANON_RESULTS_OUT="${work}/rust.results" cargo test --locked -p canonprims-json --test corpus corpus
-run go bash -c "cd go/canon && GOWORK=off CGO_ENABLED=0 CANON_RESULTS_OUT=\"${work}/go.results\" go test -count=1 -run '^TestCorpus$' ."
+run rust env CANONPRIMS_RESULTS_OUT="${work}/rust.results" cargo test --locked -p canonprims-json --test corpus corpus
+run go bash -c "GOWORK=off CGO_ENABLED=0 CANONPRIMS_RESULTS_OUT=\"${work}/go.results\" go test -count=1 -run '^TestCorpus$' ./canon"
 if [ ! -s "${work}/rust.results" ] || [ ! -s "${work}/go.results" ]; then
   echo "crosscheck: a harness wrote no result lines" >&2
   exit 1
@@ -55,7 +55,7 @@ for line in sys.stdin:
         print(m["executable"])')"
 go_driver="${work}/canon-diff-go"
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) go_driver="${go_driver}.exe" ;; esac
-(cd go/canon && GOWORK=off CGO_ENABLED=0 go build -o "${go_driver}" ./internal/difftool)
+GOWORK=off CGO_ENABLED=0 go build -o "${go_driver}" ./canon/internal/difftool
 
 for seed in ${seeds}; do
   "${python}" -I scripts/crosscheck-gen.py "${seed}" "${count}" > "${work}/in.${seed}"

@@ -5,7 +5,7 @@
 // input (an empty line is the empty input); for each it writes
 // "ok <hex of canonical bytes>" or "<refusal code>". It always uses the
 // default limits, exits 0 at end of input, and exits 2 on a line that is not
-// valid hex.
+// valid hex or when a write fails (a truncated result must never exit 0).
 package main
 
 import (
@@ -16,7 +16,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/3leaps/canonprims/go/canon"
+	"github.com/3leaps/canonprims/canon"
 )
 
 func main() {
@@ -26,7 +26,19 @@ func main() {
 func run(stdin io.Reader, stdout, stderr io.Writer) int {
 	r := bufio.NewReaderSize(stdin, 1<<20)
 	w := bufio.NewWriterSize(stdout, 1<<20)
-	defer w.Flush()
+	// fail reports to stderr after flushing whatever results were written.
+	fail := func(format string, args ...any) int {
+		_ = w.Flush()
+		_, _ = fmt.Fprintf(stderr, format, args...)
+		return 2
+	}
+	done := func() int {
+		if err := w.Flush(); err != nil {
+			_, _ = fmt.Fprintf(stderr, "difftool: write: %v\n", err)
+			return 2
+		}
+		return 0
+	}
 	lim := canon.DefaultLimits()
 	for lineNo := 1; ; lineNo++ {
 		line, err := r.ReadSlice('\n')
@@ -40,37 +52,37 @@ func run(stdin io.Reader, stdout, stderr io.Writer) int {
 			line = buf
 		}
 		if err != nil && err != io.EOF {
-			fmt.Fprintf(stderr, "difftool: read: %v\n", err)
-			return 2
+			return fail("difftool: read: %v\n", err)
 		}
 		if err == io.EOF && len(line) == 0 {
-			return 0
+			return done()
 		}
 		if n := len(line); n > 0 && line[n-1] == '\n' {
 			line = line[:n-1]
 		}
 		in, ok := decodeLowerHex(line)
 		if !ok {
-			w.Flush()
-			fmt.Fprintf(stderr, "difftool: line %d: not valid hex\n", lineNo)
-			return 2
+			return fail("difftool: line %d: not valid hex\n", lineNo)
 		}
+		var werr error
 		out, cerr := canon.Canonicalize(canon.JCS, in, lim)
 		if cerr != nil {
 			var ref canon.Refusal
 			if !errors.As(cerr, &ref) {
-				w.Flush()
-				fmt.Fprintf(stderr, "difftool: %v\n", cerr)
-				return 2
+				return fail("difftool: %v\n", cerr)
 			}
-			w.WriteString(string(ref.Code))
+			_, werr = w.WriteString(string(ref.Code))
 		} else {
-			w.WriteString("ok ")
-			w.WriteString(hex.EncodeToString(out))
+			_, werr = w.WriteString("ok " + hex.EncodeToString(out))
 		}
-		w.WriteByte('\n')
+		if werr == nil {
+			werr = w.WriteByte('\n')
+		}
+		if werr != nil {
+			return fail("difftool: write: %v\n", werr)
+		}
 		if err == io.EOF {
-			return 0
+			return done()
 		}
 	}
 }
@@ -81,7 +93,7 @@ func decodeLowerHex(s []byte) ([]byte, bool) {
 		return nil, false
 	}
 	for _, c := range s {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return nil, false
 		}
 	}

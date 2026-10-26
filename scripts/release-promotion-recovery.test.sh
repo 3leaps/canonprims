@@ -37,7 +37,7 @@ printf synthetic >"$scratch/local/SHA256SUMS.asc"
 printf synthetic >"$scratch/local/SHA512SUMS.asc"
 cp "$scratch/local/"* "$scratch/remote/"
 commit="$(git -C "$fixture" rev-parse HEAD)"
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$commit" >"$scratch/local.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$commit" >"$scratch/local.anchor"
 cp "$scratch/local.anchor" "$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/ceremony.anchor"
 cat >"$scratch/bin/gh" <<'SH'

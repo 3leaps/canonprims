@@ -18,12 +18,12 @@ printf '1.2.3\n' >"$fixture/VERSION"
 cat >"$fixture/scripts/release-verify-published-tag.sh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-# The remote tags, as the real verifier would find them.
-object=1111111111111111111111111111111111111111 module=3333333333333333333333333333333333333333
-[[ "${MOVED:-0}" == 0 ]] || module=6666666666666666666666666666666666666666
-[[ "$CANONPRIMS_EXPECTED_TAG_OBJECT" == "$object" && "$CANONPRIMS_EXPECTED_MODULE_TAG_OBJECT" == "$module" &&
-	"$CANONPRIMS_EXPECTED_COMMIT" == "$FIXTURE_COMMIT" ]] || { echo 'error: published tags differ from the anchor' >&2; exit 1; }
-printf 'tag=v1.2.3\nobject=%s\nmodule_object=%s\ncommit=%s\n' "$object" "$module" "$FIXTURE_COMMIT" >"$CANONPRIMS_ANCHOR_OUT"
+# The remote tag, as the real verifier would find it.
+object=1111111111111111111111111111111111111111
+[[ "${MOVED:-0}" == 0 ]] || object=6666666666666666666666666666666666666666
+[[ "$CANONPRIMS_EXPECTED_TAG_OBJECT" == "$object" && "$CANONPRIMS_EXPECTED_COMMIT" == "$FIXTURE_COMMIT" ]] ||
+	{ echo 'error: published tags differ from the anchor' >&2; exit 1; }
+printf 'tag=v1.2.3\nobject=%s\ncommit=%s\n' "$object" "$FIXTURE_COMMIT" >"$CANONPRIMS_ANCHOR_OUT"
 SH
 chmod +x "$fixture/scripts/"*.sh
 git -C "$fixture" config user.name fixture
@@ -32,8 +32,7 @@ git -C "$fixture" add -A
 git -C "$fixture" commit -qm fixture
 commit="$(git -C "$fixture" rev-parse HEAD)"
 object=1111111111111111111111111111111111111111
-module=3333333333333333333333333333333333333333
-printf 'tag=v1.2.3\nobject=%s\nmodule_object=%s\ncommit=%s\n' "$object" "$module" "$commit" >"$scratch/ceremony.anchor"
+printf 'tag=v1.2.3\nobject=%s\ncommit=%s\n' "$object" "$commit" >"$scratch/ceremony.anchor"
 cat >"$scratch/bin/gh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -64,9 +63,11 @@ case "$1 $2" in
 	python3 - "$dir/$crate.identity.json" "$crate" "$digest" <<'PY'
 import json, os, sys
 r = {"format": "canonprims-crate-verification/v0", "repository": "3leaps/canonprims", "tag": "v1.2.3",
-     "object": "1" * 40, "module_object": "3" * 40, "commit": os.environ["FIXTURE_COMMIT"],
+     "object": "1" * 40, "commit": os.environ["FIXTURE_COMMIT"],
      "crate": sys.argv[2], "version": "1.2.3", "cargo": "cargo 1.88.0", "registry": "crates-io",
      "sha256": sys.argv[3], "run_id": os.environ.get("RECORD_RUN", "7"), "run_attempt": os.environ.get("RECORD_ATTEMPT", "2")}
+if os.environ.get("RECORD_OBJECT"):
+    r["object"] = os.environ["RECORD_OBJECT"]
 if os.environ.get("RECORD_MODULE"):
     r["module_object"] = os.environ["RECORD_MODULE"]
 if os.environ.get("RECORD_REGISTRY"):
@@ -116,14 +117,17 @@ refused 'workflow identity mismatch' RUN_PATH=ci.yml
 refused 'run attempt changed during download' ATTEMPT_MOVED=1
 refused 'record names another run or attempt' RECORD_RUN=8
 refused 'record names another run or attempt' RECORD_ATTEMPT=1
-refused 'module_object differs' RECORD_MODULE=4444444444444444444444444444444444444444
+refused 'object differs' RECORD_OBJECT=4444444444444444444444444444444444444444
+refused 'malformed crate verification record' RECORD_MODULE=4444444444444444444444444444444444444444
 refused 'registry differs' RECORD_REGISTRY=testreg
 refused 'does not have the recorded digest' TAMPER=1
 refused 'other entries than the package' EXTRA=1
 refused 'unsafe artifact entry' LINK=1
 refused 'ceremony anchor' -u CANONPRIMS_RELEASE_ANCHOR_FILE
-sed 's/^module_object=.*/module_object=5555555555555555555555555555555555555555/' "$scratch/ceremony.anchor" >"$scratch/other.anchor"
+sed 's/^object=.*/object=5555555555555555555555555555555555555555/' "$scratch/ceremony.anchor" >"$scratch/other.anchor"
 refused 'published tags differ from the anchor' CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/other.anchor"
+printf 'module_object=%s\n' 3333333333333333333333333333333333333333 | cat "$scratch/ceremony.anchor" - >"$scratch/other.anchor"
+refused 'malformed ceremony anchor' CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/other.anchor"
 refused 'published tags differ from the anchor' MOVED=1
 # An existing record is never overwritten.
 fetch canonprims-core >/dev/null

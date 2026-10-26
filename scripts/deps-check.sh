@@ -53,12 +53,17 @@ sys.exit(1 if bad else 0)'; then
   echo "deps-check: a prim or rsfulmen appears in the resolved dependency graph, or the graph could not be read" >&2
   fail=1
 fi
-if grep -nE '^[[:space:]]*(require|replace)\b' go/canon/go.mod; then
-  echo "deps-check: go/canon must have no require or replace directives" >&2
+if grep -nE '^[[:space:]]*(require|replace)\b' go.mod; then
+  echo "deps-check: go.mod must have no require or replace directives" >&2
   fail=1
 fi
-if [ -n "$(cd go/canon && GOWORK=off go list -deps -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./... | grep -v '^github.com/3leaps/canonprims/go/canon' || true)" ]; then
-  echo "deps-check: go/canon imports a non-standard package" >&2
+# A failed go list (an unresolvable import, a broken module) is a refusal, not
+# an empty result.
+if ! go_deps="$(GOWORK=off go list -deps -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./...)"; then
+  echo "deps-check: go list failed; the Go dependency graph could not be read" >&2
+  fail=1
+elif [ -n "$(printf '%s\n' "$go_deps" | grep -Ev '^(github.com/3leaps/canonprims(/.*)?)?$' || true)" ]; then
+  echo "deps-check: the Go module imports a non-standard package" >&2
   fail=1
 fi
 exit "${fail}"

@@ -7,7 +7,7 @@ set -euo pipefail
 
 tag_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 tag_repo_slug=3leaps/canonprims
-tag_go_module=github.com/3leaps/canonprims/go/canon
+tag_go_module=github.com/3leaps/canonprims
 
 tag_die() {
 	echo "error: $*" >&2
@@ -31,12 +31,12 @@ tag_version() {
 	}
 }
 
-# The release tag set is fixed: the canonical vX.Y.Z tag and the go/canon/vX.Y.Z
-# module tag, always both. It is not configuration, so nothing in a checkout can
-# narrow it. tag_load_set fills the tag_names array; callers use it directly and
-# never read the set through a pipe or process substitution.
-# With --tagged, the caller has already checked VERSION and go/canon/go.mod in
-# the tagged commit, so the working tree is not consulted.
+# The release tag set is fixed: the one vX.Y.Z tag, which the Rust crates and
+# the root Go module share. It is not configuration, so nothing in a checkout
+# can widen or rename it. tag_load_set fills the tag_names array; callers use it
+# directly and never read the set through a pipe or process substitution.
+# With --tagged, the caller has already checked VERSION and go.mod in the
+# tagged commit, so the working tree is not consulted.
 tag_load_set() {
 	tag_names=()
 	if [[ "${1:-}" == --tagged ]]; then
@@ -46,17 +46,17 @@ tag_load_set() {
 		}
 	else
 		tag_version || return 1
-		[[ -f "$tag_root/go/canon/go.mod" ]] || {
-			tag_die 'go/canon/go.mod is required; a release carries both tags'
+		[[ -f "$tag_root/go.mod" ]] || {
+			tag_die 'go.mod is required at the repository root; the release tag also releases the Go module'
 			return 1
 		}
-		[[ "$(sed -n 's/^module[[:space:]]\{1,\}//p' "$tag_root/go/canon/go.mod" | tr -d '\r')" == "$tag_go_module" ]] || {
-			tag_die "go/canon/go.mod must declare module $tag_go_module"
+		[[ "$(sed -n 's/^module[[:space:]]\{1,\}//p' "$tag_root/go.mod" | tr -d '\r')" == "$tag_go_module" ]] || {
+			tag_die "go.mod must declare module $tag_go_module"
 			return 1
 		}
 	fi
 	# shellcheck disable=SC2034 # Consumed by scripts sourcing this helper.
-	tag_names=("$CANONPRIMS_RELEASE_TAG" "go/canon/$CANONPRIMS_RELEASE_TAG")
+	tag_names=("$CANONPRIMS_RELEASE_TAG")
 }
 
 tag_identity() {

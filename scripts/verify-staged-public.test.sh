@@ -37,7 +37,7 @@ chmod +x "$fixture/scripts/"*.sh
 git -C "$fixture" add -A
 git -C "$fixture" commit -qm fixture
 git -C "$fixture" tag v1.2.3
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$(git -C "$fixture" rev-parse HEAD)" >"$scratch/assets.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$(git -C "$fixture" rev-parse HEAD)" >"$scratch/assets.anchor"
 cp "$scratch/assets.anchor" "$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_ANCHOR_FILE="$scratch/ceremony.anchor"
 export CANONPRIMS_RELEASE_TAG=v1.2.3
@@ -92,7 +92,7 @@ rm docs/security/canonprims-minisign.pub
 git add -A
 git commit -qm 'missing public key fixture'
 git tag -f v1.2.3 >/dev/null
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
 cp "$scratch/assets.anchor" "$scratch/ceremony.anchor"
 fail ./scripts/release-stage-public.sh "$scratch/assets"
 fail ./scripts/verify-staged-public.sh "$scratch/assets"
@@ -100,7 +100,7 @@ ln -s "$scratch/minisign.good" docs/security/canonprims-minisign.pub
 git add -A
 git commit -qm 'symlink public key fixture'
 git tag -f v1.2.3 >/dev/null
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
 cp "$scratch/assets.anchor" "$scratch/ceremony.anchor"
 fail ./scripts/release-stage-public.sh "$scratch/assets"
 fail ./scripts/verify-staged-public.sh "$scratch/assets"
@@ -109,14 +109,14 @@ rm docs/security/canonprims-minisign.pub
 git add -A
 git commit -qm 'empty public key fixture'
 git tag -f v1.2.3 >/dev/null
-printf 'tag=v1.2.3\nobject=%040d\nmodule_object=%040d\ncommit=%s\n' 1 3 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
+printf 'tag=v1.2.3\nobject=%040d\ncommit=%s\n' 1 "$(git rev-parse HEAD)" >"$scratch/assets.anchor"
 cp "$scratch/assets.anchor" "$scratch/ceremony.anchor"
 fail ./scripts/release-stage-public.sh "$scratch/assets"
 : >"$scratch/assets/canonprims-minisign.pub"
 fail ./scripts/verify-staged-public.sh "$scratch/assets"
 # A staged anchor that differs from the recorded ceremony anchor in any field
 # is refused; a missing or malformed ceremony record is refused as such.
-for field in object module_object commit; do
+for field in object commit; do
     sed "s/^$field=.*/$field=9999999999999999999999999999999999999999/" "$scratch/ceremony.anchor" >"$scratch/assets.anchor"
     fail ./scripts/verify-staged-public.sh "$scratch/assets"
     grep -q 'differs from the recorded ceremony anchor' "$scratch/output" || { cat "$scratch/output" >&2; exit 1; }
