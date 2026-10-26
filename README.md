@@ -116,6 +116,7 @@ defects, are in [docs/spec/jcs-rfc8785.md](docs/spec/jcs-rfc8785.md).
 make check        # everything CI runs: fmt, lint, tests, corpus, witnesses, crosscheck, deny
 make crosscheck   # Rust and Go agreement only
 make corpus       # regenerate the corpus from scripts/canonical-json-corpus.py
+make doctor       # host tool versions against the recommended minimums
 ```
 
 Requirements:
@@ -125,6 +126,14 @@ Requirements:
 - Python 3.
 - Node.js and network access to GitHub, for the independent corpus witnesses.
 - `cargo-deny`.
+
+`.goneat/tools.yaml` declares a recommended minimum version for each host tool
+the checks and the release ceremony run (git, gh, jq, Python, gpg, minisign,
+Go), and `make doctor` reports each one against it (`DOCTOR_SCOPE=dev` for the
+development set). The minimums are the versions this repository is known to
+work with, not proven lower bounds; older versions may work, YMMV. Two are
+firm: jq 1.6 rejects a jq keyword used as a variable name, and the release
+scripts refuse Python older than 3.11.
 
 The corpus expectations are written by hand or taken from RFC 8785. They are
 not produced by either implementation. `make witness` checks the expected

@@ -12,7 +12,8 @@ maintainer's machine. CI holds no signing, release or registry authority.
 ## Prerequisites
 
 - `gpg`, `minisign`, `gh`, `jq`, `python3` (3.11 or newer) and the workspace
-  MSRV toolchain installed
+  MSRV toolchain installed. `make doctor` reports each tool's version against
+  the recommended minimum in `.goneat/tools.yaml` (it needs `goneat`).
 - decernor 0.1.8 or newer as a regular file at an absolute path
 - The ceremony environment (outside this repository):
 

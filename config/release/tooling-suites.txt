@@ -1,5 +1,6 @@
 check-registry-config
 deps-check
+doctor
 jq-portability
 release-anchors
 release-assets
