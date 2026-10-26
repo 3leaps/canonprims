@@ -7,6 +7,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-26
+
 - RFC 8785 JSON Canonicalization Scheme (`jcs/rfc8785`) over a strict I-JSON
   loader, in Rust (`canonprims-core`, `canonprims-json`) and in pure Go
   (`github.com/3leaps/canonprims/canon`), with the same refusal codes and explicit limits
@@ -23,3 +25,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   the registry token is released only for the verified package's checksum
 - Public-surface checks: a vocabulary-free content check of tracked files in
   `make check`, and a maintainer-only limensafe scan in `make pr-final`
+
+[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/3leaps/canonprims/releases/tag/v0.1.0
