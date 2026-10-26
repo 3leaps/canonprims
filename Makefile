@@ -13,7 +13,7 @@ SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 .PHONY: all help check precommit prepush fmt fmt-check lint test test-rust test-go msrv-check
-.PHONY: surface-check jq-portability doctor
+.PHONY: pr-final surface-scan content-check jq-portability doctor
 .PHONY: corpus corpus-check witness witness-controls crosscheck deny deps-check workflow-pin version version-check build clean
 .PHONY: release-tooling-test release-check release-preflight release-prepare-tag-message release-tag release-push-tag
 .PHONY: release-verify-tag release-verify-remote-tag release-record-anchor release-export-pin release-validate-pin
@@ -34,20 +34,31 @@ all: check
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-check: fmt-check lint test corpus-check witness witness-controls crosscheck deps-check jq-portability version-check deny workflow-pin ## Everything CI runs on one host
+check: fmt-check lint test corpus-check witness witness-controls crosscheck deps-check content-check jq-portability version-check deny workflow-pin ## Everything CI runs on one host
 	@echo "[ok] check"
 
 precommit: fmt-check lint ## Fast pre-commit gate
 	@echo "[ok] precommit"
 
-prepush: check surface-check ## Pre-push gate
+prepush: check surface-scan ## Pre-push gate (the surface scan is skipped without a catalog)
 	@echo "[ok] prepush"
 
-# The maintainer's public-surface check: CANONPRIMS_SURFACE_CHECK names an
-# executable outside the repository, run with the repository root. Optional
-# for prepush; release-preflight requires it.
-surface-check: ## Run the maintainer's public-surface check, when CANONPRIMS_SURFACE_CHECK is set
-	@scripts/surface-check.sh
+# Before opening or updating a PR: everything CI runs, plus the maintainer's
+# public-surface scan, which is required here, including the PR title and body
+# in the file named by CANONPRIMS_SURFACE_PR_TEXT.
+pr-final: check ## Before opening or updating a PR: check plus the required surface scan
+	@CANONPRIMS_SURFACE_SCAN_REQUIRED=1 PYTHON=$(PYTHON) scripts/surface-scan.sh
+	@echo "[ok] pr-final"
+
+# The public-surface scan uses limensafe with a maintainer catalog named by
+# LIMENSAFE_CATALOG_PATH, outside this repository. It never runs in CI.
+surface-scan: ## Public-surface scan (tree, commit messages, PR text, branch) when LIMENSAFE_CATALOG_PATH is set
+	@PYTHON=$(PYTHON) scripts/surface-scan.sh
+
+# Vocabulary-free shapes only (local paths, keys, tokens, commit markers); runs
+# in CI as part of check.
+content-check: ## Refuse local paths, private keys, tokens and commit markers in tracked files
+	@$(PYTHON) -I -B scripts/content-check.py
 
 fmt: ## Format Rust and Go
 	$(CARGO) fmt --all
@@ -177,7 +188,7 @@ release-preflight: ## Pre-tag gate on a clean main synced with origin
 	@# The source to be tagged must be inert for Cargo before anything builds it.
 	$(PYTHON) -I scripts/release-source-check.py HEAD
 	$(MAKE) check release-tooling-test release-check
-	CANONPRIMS_SURFACE_CHECK_REQUIRED=1 scripts/surface-check.sh
+	CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_SCOPE=release PYTHON=$(PYTHON) scripts/surface-scan.sh
 	@test -f "docs/releases/$(NOTES_NAME).md" || { echo "error: docs/releases/$(NOTES_NAME).md is required"; exit 1; }
 	@digest="$$(shasum -a 256 conformance/canonical-json/v0/MANIFEST.json | cut -c1-64)"; \
 	grep -q "$$digest" "docs/releases/$(NOTES_NAME).md" || { echo "error: release notes must record the corpus MANIFEST.json sha256 $$digest"; exit 1; }

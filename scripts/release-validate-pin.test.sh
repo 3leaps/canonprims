@@ -102,7 +102,8 @@ gpg --homedir "$fixture_dir/gpg" --batch --armor --export >"$repo/docs/security/
 gpg --homedir "$fixture_dir/gpg-other" --batch --armor --export >>"$repo/docs/security/release-signing-keys.asc"
 fixture_commit "$repo" two-keys
 expect_fail validate
-printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\n' >"$repo/docs/security/release-signing-keys.asc"
+# Split so this file never holds the whole header (content-check refuses it).
+printf -- '-----BEGIN PGP PRIVATE %s-----\n' 'KEY BLOCK' >"$repo/docs/security/release-signing-keys.asc"
 fixture_commit "$repo" private
 expect_fail_with 'private material' validate
 echo '[ok] pin validation controls passed'

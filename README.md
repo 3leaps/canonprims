@@ -117,6 +117,7 @@ make check        # everything CI runs: fmt, lint, tests, corpus, witnesses, cro
 make crosscheck   # Rust and Go agreement only
 make corpus       # regenerate the corpus from scripts/canonical-json-corpus.py
 make doctor       # host tool versions against the recommended minimums
+make pr-final     # before a PR: check plus the maintainer's public-surface scan
 ```
 
 Requirements:
