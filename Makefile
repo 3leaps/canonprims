@@ -44,8 +44,8 @@ prepush: check surface-scan ## Pre-push gate (the surface scan is skipped withou
 	@echo "[ok] prepush"
 
 # Before opening or updating a PR: everything CI runs, plus the maintainer's
-# public-surface scan, which is required here. Pass the PR title and body in
-# CANONPRIMS_SURFACE_PR_TEXT to scan them too.
+# public-surface scan, which is required here, including the PR title and body
+# in the file named by CANONPRIMS_SURFACE_PR_TEXT.
 pr-final: check ## Before opening or updating a PR: check plus the required surface scan
 	@CANONPRIMS_SURFACE_SCAN_REQUIRED=1 PYTHON=$(PYTHON) scripts/surface-scan.sh
 	@echo "[ok] pr-final"
@@ -58,7 +58,7 @@ surface-scan: ## Public-surface scan (tree, commit messages, PR text, branch) wh
 # Vocabulary-free shapes only (local paths, keys, tokens, commit markers); runs
 # in CI as part of check.
 content-check: ## Refuse local paths, private keys, tokens and commit markers in tracked files
-	@$(PYTHON) -I scripts/content-check.py
+	@$(PYTHON) -I -B scripts/content-check.py
 
 fmt: ## Format Rust and Go
 	$(CARGO) fmt --all

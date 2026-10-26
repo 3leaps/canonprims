@@ -21,6 +21,9 @@ term="zq""lantern" canary="canp-test-canary-""7f3e19a2"
 printf '%s==>Codename\n%s==>CanonprimsCanary\n' "$term" "$canary" >"$scratch/terms.txt"
 "$bin" catalog build --from-termlist "$scratch/terms.txt" --out "$scratch/catalog.yaml" \
 	--catalog-id canonprims-release >/dev/null 2>&1
+printf '%s==>CanonprimsCanary\n' "$canary" >"$scratch/onlycanary.txt"
+"$bin" catalog build --from-termlist "$scratch/onlycanary.txt" --out "$scratch/onlycanary.yaml" \
+	--catalog-id canonprims-release >/dev/null 2>&1
 printf '%s==>Codename\n' "$term" >"$scratch/nocanary.txt"
 "$bin" catalog build --from-termlist "$scratch/nocanary.txt" --out "$scratch/nocanary.yaml" \
 	--catalog-id canonprims-release >/dev/null 2>&1
@@ -34,7 +37,8 @@ git init -q -b main "$repo"
 git -C "$repo" config user.name fixture
 git -C "$repo" config user.email fixture@example.invalid
 mkdir -p "$repo/scripts"
-cp "$root/scripts/surface-scan.sh" "$root/scripts/surface-canary.py" "$repo/scripts/"
+cp "$root/scripts/surface-scan.sh" "$root/scripts/surface-canary.py" "$root/scripts/surface-catalog-path.py" \
+	"$root/scripts/export-committed-tree.py" "$root/scripts/committed_tree.py" "$repo/scripts/"
 printf 'clean\n' >"$repo/README"
 git -C "$repo" add -A
 git -C "$repo" commit -qm 'clean base'
@@ -68,12 +72,25 @@ refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$scratch/repo-link/ins
 ln -s "$repo/inside.yaml" "$scratch/outside-link.yaml"
 refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$scratch/outside-link.yaml"
 rm -f "$repo/inside.yaml"
+# A hard link to the catalog inside the repository (untracked) is refused.
+cp "$scratch/catalog.yaml" "$scratch/linked.yaml"
+ln "$scratch/linked.yaml" "$repo/linked-inside.yaml"
+refused 'hard link' LIMENSAFE_CATALOG_PATH="$scratch/linked.yaml"
+rm -f "$repo/linked-inside.yaml"
+# The repository spelled in another letter case, where the volume ignores case.
+cp "$scratch/catalog.yaml" "$repo/inside.yaml"
+upper="$(dirname "$repo")/$(basename "$repo" | tr '[:lower:]' '[:upper:]')"
+if [[ -e "$upper/inside.yaml" ]]; then
+	refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$upper/inside.yaml"
+fi
+rm -f "$repo/inside.yaml"
 git -C "$repo" worktree add -q --detach "$scratch/wt" HEAD
 cp "$scratch/catalog.yaml" "$scratch/wt/inside.yaml"
 refused 'outside this repository' LIMENSAFE_CATALOG_PATH="$scratch/wt/inside.yaml"
 git -C "$repo" worktree remove --force "$scratch/wt"
 # The catalog must be the right one and block its own canary.
 refused 'no usable canary' LIMENSAFE_CATALOG_PATH="$scratch/nocanary.yaml"
+refused 'no entity besides CanonprimsCanary' LIMENSAFE_CATALOG_PATH="$scratch/onlycanary.yaml"
 refused 'did not load' LIMENSAFE_CATALOG_PATH="$scratch/otherid.yaml"
 # Scanner errors fail closed and say so, on stderr that is never hidden.
 printf '#!/bin/sh\necho boom >&2\nexit 7\n' >"$scratch/broken"
@@ -113,6 +130,27 @@ git -C "$repo" add -A
 git -C "$repo" commit -qm 'add notes'
 refused '\[block\] tree' "${cat_ok[@]}"
 git -C "$repo" reset -q --hard HEAD~1
+# A committed file marked export-ignore is still pushed, so it is scanned.
+printf 'notes %s\n' "$term" >"$repo/hidden.txt"
+printf 'hidden.txt export-ignore\n' >"$repo/.gitattributes"
+git -C "$repo" add -A
+git -C "$repo" commit -qm 'add hidden notes'
+refused '\[block\] tree' "${cat_ok[@]}"
+git -C "$repo" reset -q --hard HEAD~1
+# A committed symlink's target text is scanned.
+ln -s "/opt/$term/x" "$repo/link"
+git -C "$repo" add link
+git -C "$repo" commit -qm 'add link'
+refused '\[block\] tree' "${cat_ok[@]}"
+git -C "$repo" reset -q --hard HEAD~1
+# A local edit does not hide a committed term.
+printf 'notes %s\n' "$term" >"$repo/notes.txt"
+git -C "$repo" add -A
+git -C "$repo" commit -qm 'add notes'
+printf 'scrubbed\n' >"$repo/notes.txt"
+refused '\[block\] tree' "${cat_ok[@]}"
+git -C "$repo" checkout -q -- notes.txt
+git -C "$repo" reset -q --hard HEAD~1
 printf 'more\n' >"$repo/more.txt"
 git -C "$repo" add -A
 git -C "$repo" commit -qm "mention $term"
@@ -128,6 +166,10 @@ refused 'non-empty file' "${cat_ok[@]}" CANONPRIMS_SURFACE_PR_TEXT="$scratch/pr-
 git -C "$repo" switch -q -c "topic-$term"
 refused '\[block\] branch name' "${cat_ok[@]}"
 git -C "$repo" switch -q feature
+# Required in PR scope, the PR text must be given; the release scope does not need it.
+refused 'CANONPRIMS_SURFACE_PR_TEXT is required' "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1
+passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_PR_TEXT="$scratch/pr-clean.md"
+passes "${cat_ok[@]}" CANONPRIMS_SURFACE_SCAN_REQUIRED=1 CANONPRIMS_SURFACE_SCOPE=release
 # A missing base is an error, not an empty commit range.
 refused 'base no-such-ref not found' "${cat_ok[@]}" CANONPRIMS_SURFACE_BASE=no-such-ref
-echo '[ok] surface-scan: catalog rules, canary, scanner errors, and each surface (tree, commits, pr text, branch)'
+echo '[ok] surface-scan: catalog location (path, case, hard link), canary and vocabulary, scanner errors, each surface incl. export-ignore, symlinks and local edits, required PR text'

@@ -2,33 +2,49 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Refuse generic secret and local-path shapes in tracked files.
 
-Usage: content-check.py [ROOT]   (default: the repository root)
+Usage: content-check.py [ROOT [REF]]   (default: the repository root, HEAD)
 
 Vocabulary-free and safe to run anywhere, including CI: it looks for shapes,
-never for names. It refuses a home directory under /Users or /home and a
-Windows user profile (except synthetic fixture names), a private-key block,
+never for names. It refuses a home directory under /Users or /home, the root
+home, and a Windows user profile (except synthetic fixture names), a
+private-key block (OpenSSH, PKCS, EC or OpenPGP),
 GitHub and AWS access tokens, and developer "remove before commit" markers.
-It reads the tracked files at HEAD only.
+It reads the committed blobs at REF, symlink targets included, through git;
+the working tree is never read, so a local edit cannot hide a committed leak.
 
 The organization's own vocabulary is a separate, maintainer-only scan
 (scripts/surface-scan.sh); it never runs in CI.
 """
 
 import re
-import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from committed_tree import committed  # noqa: E402
+
 # Synthetic home names used by fixtures and CI runners, never real people.
 SYNTHETIC = r"(?:someone|user|example|runner|runneradmin|ubuntu)"
+# A name matches the allowlist only as a whole name (someone2 is not someone).
+NAME_END = r"(?![A-Za-z0-9._-])"
 SHAPES = {
+    # Any user name: mixed case, digits, a single character, with or without a
+    # trailing slash. Not preceded by a URL or path character.
     "home directory": re.compile(
-        r"(?<![A-Za-z0-9_.:/-])/(?:Users|home)/(?!" + SYNTHETIC + r"/)[a-z][a-z0-9._-]{1,31}/"
+        r"(?<![A-Za-z0-9_.:/-])/(?:Users|home)/(?!" + SYNTHETIC + NAME_END + r")"
+        r"[A-Za-z0-9_][A-Za-z0-9._-]{0,63}" + NAME_END
     ),
     "Windows user profile": re.compile(
-        r"\b[A-Za-z]:[\\/]Users[\\/](?!" + SYNTHETIC + r"[\\/])[A-Za-z][A-Za-z0-9._-]{1,31}[\\/]", re.IGNORECASE
+        r"\b[A-Za-z]:[\\/]Users[\\/](?!" + SYNTHETIC + NAME_END + r")"
+        r"[A-Za-z0-9_][A-Za-z0-9._ -]{0,63}?(?=[\\/\"'\s]|$)",
+        re.IGNORECASE,
     ),
-    "private key block": re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----"),
+    # The root user's home holds keys and shell history on any Unix host.
+    "root home directory": re.compile(r"(?<![A-Za-z0-9_.:/-])/root/[A-Za-z0-9._-]"),
+    # OpenSSH, PKCS#1/#8, EC and encrypted keys, and the OpenPGP secret-key block.
+    "private key block": re.compile(
+        r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"
+    ),
     "GitHub token": re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}"),
     "AWS access key": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     # The markers are joined from fragments so this file never holds one whole.
@@ -43,21 +59,12 @@ SHAPES = {
 }
 
 
-def tracked(root):
-    out = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=True
-    ).stdout
-    return [p for p in out.decode("utf-8", "surrogateescape").split("\0") if p]
-
-
 def main():
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent)
+    args = sys.argv[1:]
+    root = Path(args[0] if args else Path(__file__).resolve().parent.parent)
+    ref = args[1] if len(args) > 1 else "HEAD"
     findings = []
-    for rel in tracked(root):
-        path = root / rel
-        if path.is_symlink() or not path.is_file():
-            continue
-        data = path.read_bytes()
+    for rel, _mode, data in committed(root, ref):
         if b"\0" in data[:8192]:
             continue  # binary
         text = data.decode("utf-8", "replace")

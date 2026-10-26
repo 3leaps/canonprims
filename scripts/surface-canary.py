@@ -7,7 +7,7 @@ Usage: surface-canary.py CATALOG REPLACEMENT_ID
 The canary is the single alias of the one entity whose replacement_suggestion
 is REPLACEMENT_ID. The term is read from the maintainer's catalog at run time,
 so this repository never contains it. Fails unless exactly one such entity
-with exactly one alias exists.
+with exactly one alias exists and the catalog holds at least one other entity.
 """
 
 import sys
@@ -53,6 +53,12 @@ def main():
     aliases = matches[0]["aliases"]
     if len(aliases) != 1 or not aliases[0]:
         sys.exit(f"error: the {wanted} entity must have exactly one alias")
+    # A catalog holding only its canary would pass the canary check and block
+    # nothing else: require real vocabulary besides it.
+    with open(path, encoding="utf-8") as handle:
+        others = sum(1 for e in entities(handle) if e["replacement"] != wanted)
+    if others < 1:
+        sys.exit(f"error: the catalog holds no entity besides {wanted}")
     print(aliases[0])
 
 

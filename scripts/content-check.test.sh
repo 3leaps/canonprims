@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# content-check refuses each shape in a tracked file, accepts synthetic fixture
-# homes, and reads tracked files only. Fixtures are built from fragments at run
+# content-check refuses each shape in a committed file, accepts synthetic fixture
+# homes, and reads committed blobs at HEAD only (symlink targets included; the
+# working tree never hides a committed leak). Fixtures are built from fragments at run
 # time, so this file never holds a whole token or path.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -11,10 +12,11 @@ repo="$scratch/repo"
 git init -q "$repo"
 git -C "$repo" config user.name fixture
 git -C "$repo" config user.email fixture@example.invalid
-check() { python3 -I "$root/scripts/content-check.py" "$repo" >"$scratch/out" 2>&1; }
+check() { python3 -I -B "$root/scripts/content-check.py" "$repo" >"$scratch/out" 2>&1; }
 plant() {
 	printf '%s\n' "$1" >"$repo/f.txt"
 	git -C "$repo" add -A
+	git -C "$repo" commit -qm fixture --allow-empty
 }
 refused() {
 	local reason="$1" text="$2"
@@ -29,8 +31,14 @@ accepted() {
 u='Us''ers' h='ho''me' name='jd''oe'
 refused 'home directory' "see /$u/$name/projects/x"
 refused 'home directory' "log /$h/$name/build"
+refused 'home directory' "see /$u/Jane""Doe/projects/x"
+refused 'home directory' "log /$h/j/work"
+refused 'home directory' "end of line /$u/$name"
+refused 'home directory' "quoted \"/$h/$name\""
+refused 'home directory' "near miss /$h/someone2/x"
 refused 'Windows user profile' "C:\\$u\\$name\\code"
 refused 'Windows user profile' "d:/$u/$name/code"
+refused 'Windows user profile' "C:\\$u\\Jane""Doe\\code"
 refused 'private key block' "-----BEGIN OPEN""SSH PRIVATE KEY-----"
 refused 'private key block' "-----BEGIN PRIVATE"" KEY-----"
 refused 'GitHub token' "token gh""p_$(printf 'A%.0s' $(seq 1 24))"
@@ -43,10 +51,29 @@ accepted "ci /$h/runner/work and C:\\$u\\runneradmin\\x"
 accepted "url https://example.com/$u/$name/"
 accepted "token ghp_short"
 accepted 'plain text'
-# Only tracked files are read: an untracked or ignored file is not.
+# Only committed blobs at HEAD are read: an untracked file is not, and a
+# local edit cannot hide a committed leak.
 plant 'clean'
 printf 'see /%s/%s/x\n' "$u" "$name" >"$repo/untracked.txt"
 check || { echo 'error: read an untracked file' >&2; cat "$scratch/out" >&2; exit 1; }
+rm -f "$repo/untracked.txt"
+plant "token gh""p_$(printf 'C%.0s' $(seq 1 24))"
+printf 'scrubbed locally\n' >"$repo/f.txt"
+if check; then echo 'error: an unstaged scrub hid a committed token' >&2; exit 1; fi
+grep -q 'GitHub token' "$scratch/out"
+git -C "$repo" checkout -q -- f.txt
+plant 'clean'
+# A committed symlink's target is a committed blob.
+ln -s "/$u/$name/projects/x" "$repo/link"
+git -C "$repo" add link
+git -C "$repo" commit -qm 'add link'
+if check; then echo 'error: accepted a symlink to a home path' >&2; exit 1; fi
+grep -q 'link:1: home directory' "$scratch/out"
+git -C "$repo" rm -q link
+git -C "$repo" commit -qm 'drop link'
+# Another ref can be checked.
+check_ref() { python3 -I -B "$root/scripts/content-check.py" "$repo" "$1" >"$scratch/out" 2>&1; }
+if check_ref HEAD~1; then echo 'error: the earlier ref with a symlink passed' >&2; exit 1; fi
 # The real tree is clean.
-python3 -I "$root/scripts/content-check.py" "$root" >/dev/null
+python3 -I -B "$root/scripts/content-check.py" "$root" >/dev/null
 echo '[ok] content-check: home paths, Windows profiles, private keys, GitHub and AWS tokens, commit markers; synthetic homes and untracked files pass'

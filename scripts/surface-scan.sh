@@ -17,7 +17,8 @@
 #   CANONPRIMS_LIMENSAFE_BIN     optional absolute path to limensafe.
 #   CANONPRIMS_SURFACE_BASE      base for the commit-message scan (default
 #                                origin/main); scope=release scans all of HEAD.
-#   CANONPRIMS_SURFACE_PR_TEXT   a file with the PR title and body to scan.
+#   CANONPRIMS_SURFACE_PR_TEXT   a file with the PR title and body to scan;
+#                                required when the scan is required in PR scope.
 #   CANONPRIMS_SURFACE_SCAN_REQUIRED=1  require the catalog (pr-final, preflight).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
@@ -42,22 +43,18 @@ catalog="$LIMENSAFE_CATALOG_PATH"
 [[ -n "$catalog" ]] || die 'LIMENSAFE_CATALOG_PATH is set but empty'
 [[ "$catalog" == /* ]] || die 'LIMENSAFE_CATALOG_PATH must be an absolute path'
 [[ -f "$catalog" && -r "$catalog" ]] || die 'LIMENSAFE_CATALOG_PATH does not name a readable file'
-# The path as given, its physical directory, and its fully resolved target
-# must all be outside this repository and every worktree of it.
-physical="$(cd "$(dirname "$catalog")" && pwd -P)/$(basename "$catalog")"
-resolved="$("${PYTHON:-python3}" -I -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$catalog")"
+# The catalog must be outside this repository and every worktree of it, by
+# path (as given and resolved, letter case folded on a case-insensitive
+# volume) and by file identity (no hard link to it under any of them).
 common="$(git rev-parse --path-format=absolute --git-common-dir)"
 worktrees="$(git --git-dir="$common" worktree list --porcelain)" || die 'cannot enumerate worktrees'
 roots=("$root")
 while IFS= read -r line; do
 	[[ "$line" == worktree\ * ]] || continue
-	roots+=("$(cd "${line#worktree }" 2>/dev/null && pwd -P || printf '%s' "${line#worktree }")")
+	roots+=("${line#worktree }")
 done <<<"$worktrees"
-for path in "$catalog" "$physical" "$resolved"; do
-	for wt in "${roots[@]}"; do
-		case "$path" in "$wt" | "$wt"/*) die 'the catalog must be outside this repository and its worktrees' ;; esac
-	done
-done
+"${PYTHON:-python3}" -I "$root/scripts/surface-catalog-path.py" "$catalog" "${roots[@]}" 2>&3 ||
+	die 'the catalog location was refused'
 
 bin="${CANONPRIMS_LIMENSAFE_BIN:-limensafe}"
 if [[ "$bin" == */* ]]; then
@@ -133,7 +130,13 @@ rm -rf "$work/canary"
 echo '[ok] catalog blocks its canary'
 
 failed=0
-scan tree --git-archive=HEAD . || failed=1
+# Every committed blob at HEAD, symlink targets included. Not git archive,
+# which drops export-ignore paths that are still pushed.
+mkdir "$work/tree"
+"${PYTHON:-python3}" -I -B "$root/scripts/export-committed-tree.py" "$root" HEAD "$work/tree" >/dev/null 2>&3 ||
+	die 'cannot export the committed tree'
+scan tree "$work/tree" || failed=1
+rm -rf "$work/tree"
 
 if [[ "${CANONPRIMS_SURFACE_SCOPE:-pr}" == release ]]; then
 	commits="$(git rev-list HEAD)"
@@ -147,10 +150,14 @@ for sha in $commits; do
 	scan "commit ${sha:0:12}" --commit-msg - <"$work/message" || failed=1
 done
 
+# The PR title and body are a public surface. pr-final (required, PR scope)
+# must scan them; the release scope covers a tagged commit, not a PR.
 if [[ -n "${CANONPRIMS_SURFACE_PR_TEXT:-}" ]]; then
 	[[ -f "${CANONPRIMS_SURFACE_PR_TEXT}" && -s "${CANONPRIMS_SURFACE_PR_TEXT}" ]] ||
 		die 'CANONPRIMS_SURFACE_PR_TEXT does not name a non-empty file'
 	scan 'pr text' --commit-msg - <"$CANONPRIMS_SURFACE_PR_TEXT" || failed=1
+elif [[ "${CANONPRIMS_SURFACE_SCAN_REQUIRED:-0}" == 1 && "${CANONPRIMS_SURFACE_SCOPE:-pr}" != release ]]; then
+	die 'CANONPRIMS_SURFACE_PR_TEXT is required here: write the PR title and body to a file and pass it'
 fi
 
 if branch="$(git symbolic-ref --quiet --short HEAD)"; then
