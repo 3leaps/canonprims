@@ -33,9 +33,17 @@ test("byte views and strings", () => {
   assert.equal(dec(canonprims.canonicalize('"é"', L)), '"é"');
 });
 
-test("a lone surrogate in a string is encoded, not smuggled in", () => {
-  // TextEncoder replaces it with U+FFFD, which is canonical as itself.
-  assert.equal(dec(canonprims.canonicalize('"\ud800"', L)), '"�"');
+test("a string with an unpaired surrogate is refused, never repaired", () => {
+  // It has no UTF-8 form; TextEncoder would substitute U+FFFD.
+  for (const s of ['"\ud800"', '"\udc00"', '"a\ud800b"', '"\udc00\ud800"', '"\ud83d"']) {
+    for (const verb of [canonprims.canonicalize, canonprims.check, canonprims.digest]) {
+      assert.throws(() => verb(s, L), (e) => e instanceof TypeError && !(e instanceof Refusal) && /unpaired surrogate/.test(e.message));
+    }
+  }
+  // Paired surrogates and a literal U+FFFD are ordinary characters.
+  assert.equal(dec(canonprims.canonicalize('"\ud83d\ude00"', L)), '"\u{1f600}"');
+  assert.equal(dec(canonprims.canonicalize('"\ufffd"', L)), '"\ufffd"');
+  // An escaped lone surrogate is JSON text, refused by the scheme.
   assert.equal(code(() => canonprims.canonicalize('"\\ud800"', L)), "lone_surrogate");
 });
 
@@ -71,6 +79,23 @@ test("negative limits behave as 0", () => {
   }
   assert.equal(dec(canonprims.canonicalize("{}", limits({ maxObjectMembers: -1 }))), "{}");
   assert.equal(code(() => canonprims.canonicalize("[]", limits({ maxDepth: -1 }))), "too_deep");
+});
+
+test("an input over maxBytes is refused before the module sees it", () => {
+  for (const [data, max] of [["12345", 4], ["[1]", 0], ["{}", -1]]) {
+    for (const verb of [canonprims.canonicalize, canonprims.check, canonprims.digest]) {
+      try {
+        verb(data, limits({ maxBytes: max }));
+        assert.fail("accepted an oversized input");
+      } catch (e) {
+        assert.ok(e instanceof Refusal);
+        // Same code and offset as the module (and Rust, Go and Python).
+        assert.deepEqual([e.code, e.offset], ["too_large", Math.max(max, 0)]);
+      }
+    }
+  }
+  // At exactly maxBytes the input is admitted.
+  assert.equal(dec(canonprims.canonicalize("1234", limits({ maxBytes: 4 }))), "1234");
 });
 
 test("huge limits behave as the maximum", () => {

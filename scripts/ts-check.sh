@@ -28,15 +28,25 @@ for license in LICENSE-MIT LICENSE-APACHE; do
   cmp -s "${license}" "${pkg}/${license}" ||
     { echo "ts-check: bindings/typescript/${license} differs from ${license}" >&2; exit 1; }
 done
-# Each `#[allow(unsafe_code)]` must sit directly above `#[no_mangle]`.
-"${python}" -I - "${pkg}/src/lib.rs" <<'PY'
-import sys
-lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
-bad = [i + 1 for i, l in enumerate(lines)
-       if "unsafe" in l and not l.lstrip().startswith(("//", "///", "//!"))
-       and not (l.strip() == "#[allow(unsafe_code)]" and i + 1 < len(lines) and lines[i + 1].strip() == "#[no_mangle]")]
+# In every Rust file of the crate, each `#[allow(unsafe_code)]` must sit
+# directly above `#[no_mangle]`, and no other line may mention unsafe.
+"${python}" -I - "${pkg}" <<'PY'
+import pathlib, sys
+crate = pathlib.Path(sys.argv[1])
+files = sorted(p for p in crate.rglob("*.rs") if "target" not in p.relative_to(crate).parts)
+if crate / "src" / "lib.rs" not in files:
+    sys.exit("ts-check: the WebAssembly crate has no src/lib.rs")
+bad = []
+for path in files:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for i, l in enumerate(lines):
+        if "unsafe" not in l or l.lstrip().startswith(("//", "///", "//!")):
+            continue
+        if l.strip() == "#[allow(unsafe_code)]" and i + 1 < len(lines) and lines[i + 1].strip() == "#[no_mangle]":
+            continue
+        bad.append(f"{path.relative_to(crate)}:{i + 1}")
 if bad:
-    sys.exit(f"ts-check: unsafe outside an export allowance at lines {bad}")
+    sys.exit(f"ts-check: unsafe outside an export allowance at {bad}")
 PY
 
 target_dir="${CARGO_TARGET_DIR:-${root}/target}/wasm"
@@ -85,15 +95,15 @@ printf '{"name":"consumer","private":true,"type":"module"}\n' > "${work}/consume
 
 (cd "${work}/consumer" && CANONPRIMS_CORPUS_DIR="${root}/conformance/canonical-json/v0" \
   CANONPRIMS_RESULTS_OUT="${work}/ts.results" CANONPRIMS_VERSION="${version}" \
-  node --test --test-reporter=tap test/api.test.mjs test/corpus.test.mjs > "${work}/test.tap" 2>&1) ||
+  node --test --test-reporter=tap test/api.test.mjs test/allocation.test.mjs test/corpus.test.mjs > "${work}/test.tap" 2>&1) ||
   { cat "${work}/test.tap" >&2; exit 1; }
 # Every test must pass: none failed, cancelled, skipped or todo, and the
-# files did run (the API and corpus tests number more than 10).
+# files did run (the API, allocation and corpus tests number more than 15).
 "${python}" -I - "${work}/test.tap" <<'PY' ||
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 counts = {k: int(v) for k, v in re.findall(r"^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$", text, re.M)}
-ok = (len(counts) == 6 and counts["pass"] == counts["tests"] and counts["tests"] > 10
+ok = (len(counts) == 6 and counts["pass"] == counts["tests"] and counts["tests"] > 15
       and not any(counts[k] for k in ("fail", "cancelled", "skipped", "todo")))
 sys.exit(0 if ok else f"summary {counts}")
 PY

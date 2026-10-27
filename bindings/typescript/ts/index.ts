@@ -7,8 +7,9 @@
  * verbs as Rust, Go and Python: {@link canonicalize}, {@link check},
  * {@link digest} and {@link schemeInfo}. Input is a `Uint8Array` (or any
  * `ArrayBufferView`, read as its bytes); a string is encoded as UTF-8 and
- * nothing else. An input with no canonical form throws {@link Refusal} with one
- * normative code; nothing is repaired.
+ * nothing else, and a string with an unpaired surrogate (which has no UTF-8
+ * form) is a `TypeError`. An input with no canonical form throws
+ * {@link Refusal} with one normative code; nothing is repaired.
  */
 
 import { WASM_BASE64 } from "./wasm.js";
@@ -131,8 +132,30 @@ function limitArgs(l: Limits): [number, number, number, number] {
   return [limit(l, "maxBytes"), limit(l, "maxDepth"), limit(l, "maxObjectMembers"), limit(l, "maxStringBytes")];
 }
 
+// The index of the first unpaired UTF-16 surrogate, or -1. TextEncoder would
+// replace one with U+FFFD; that is a repair, so it is refused instead.
+function unpairedSurrogate(s: string): number {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const d = i + 1 < s.length ? s.charCodeAt(i + 1) : 0;
+      if (d >= 0xdc00 && d <= 0xdfff) {
+        i++;
+        continue;
+      }
+      return i;
+    }
+    if (c >= 0xdc00 && c <= 0xdfff) return i;
+  }
+  return -1;
+}
+
 function bytes(data: Input): Uint8Array {
-  if (typeof data === "string") return utf8.encode(data);
+  if (typeof data === "string") {
+    const at = unpairedSurrogate(data);
+    if (at >= 0) throw new TypeError(`canonprims: string has an unpaired surrogate at index ${at}; it has no UTF-8 form`);
+    return utf8.encode(data);
+  }
   if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   throw new TypeError("canonprims: input must be an ArrayBufferView or a string");
 }
@@ -140,7 +163,10 @@ function bytes(data: Input): Uint8Array {
 function call(data: Input, l: Limits, verb: (a: number, b: number, c: number, d: number) => number): Uint8Array {
   const args = limitArgs(l);
   const input = bytes(data);
-  if (input.length > U32_MAX) throw new Refusal("too_large", 0);
+  // Input size is checked first (spec, order of detection), here before any
+  // module memory is reserved, with the offset the module would report.
+  const maxBytes = args[0];
+  if (input.length > maxBytes) throw new Refusal("too_large", maxBytes);
   try {
     const at = wasm.input_reserve(input.length);
     new Uint8Array(wasm.memory.buffer, at, input.length).set(input);

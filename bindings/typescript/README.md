@@ -17,7 +17,9 @@ schemeInfo();
 ```
 
 Input is a `Uint8Array` or any `ArrayBufferView` (read as its bytes); a string
-is encoded as UTF-8. An input with no canonical form throws `Refusal` with a
+is encoded as UTF-8, and a string with an unpaired surrogate (no UTF-8 form) is
+a `TypeError`. An input longer than `maxBytes` is refused before it is copied
+into the module. An input with no canonical form throws `Refusal` with a
 normative `code` and an informative byte `offset`. Nothing is repaired. Limits
 follow the spec: a negative limit behaves as 0, and a limit above 2^32 - 1
 behaves as that maximum.
