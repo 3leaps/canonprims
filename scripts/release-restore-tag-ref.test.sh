@@ -57,6 +57,8 @@ printf '{"ref":"%s","object":{"type":"%s","sha":"%s"}}' "\$ref" "\$type" "\$sha"
 SH
 chmod +x "$scratch/bin/curl"
 export PATH="$scratch/bin:$PATH" GITHUB_TOKEN=fixture-job-token
+# The suite runs inside GitHub Actions too; each case sets GITHUB_ACTIONS itself.
+unset GITHUB_ACTIONS
 restore() { CANONPRIMS_RELEASE_TAG="$1" bash "$root/scripts/release-restore-tag-ref.sh" >"$scratch/out" 2>&1; }
 # run_env VAR=... ...: the restore script under extra environment, captured.
 run_env() { env "$@" bash "$root/scripts/release-restore-tag-ref.sh" >"$scratch/out" 2>&1; }
