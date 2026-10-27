@@ -4,7 +4,8 @@
 # job token (a stub curl answers from a fixture remote), so it works where an
 # anonymous ls-remote cannot (a private repository). It repairs the peeled ref
 # actions/checkout leaves, and refuses an absent, lightweight, replaced or
-# misdirected tag, a missing token, and a malformed API answer.
+# misdirected tag, a missing token, and a malformed API answer. origin is asked
+# even when the object is local, and must agree with the API answer.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 scratch="$(mktemp -d)"
@@ -49,12 +50,15 @@ if [[ "\${FIXTURE_API_MODE:-ok}" == garbage ]]; then printf 'not json'; exit 0; 
 line="\$(git -C "$scratch/remote.git" for-each-ref --format='%(objectname) %(objecttype)' "refs/tags/\$tag")"
 [[ -n "\$line" ]] || exit 22
 sha="\${line%% *}" type="\${line##* }"
+sha="\${FIXTURE_API_SHA:-\$sha}"
 ref="refs/tags/\$tag"
 [[ "\${FIXTURE_API_MODE:-ok}" != otherref ]] || ref="refs/tags/v9.9.9"
 printf '{"ref":"%s","object":{"type":"%s","sha":"%s"}}' "\$ref" "\$type" "\$sha"
 SH
 chmod +x "$scratch/bin/curl"
 export PATH="$scratch/bin:$PATH" GITHUB_TOKEN=fixture-job-token
+# The suite runs inside GitHub Actions too; each case sets GITHUB_ACTIONS itself.
+unset GITHUB_ACTIONS
 restore() { CANONPRIMS_RELEASE_TAG="$1" bash "$root/scripts/release-restore-tag-ref.sh" >"$scratch/out" 2>&1; }
 # run_env VAR=... ...: the restore script under extra environment, captured.
 run_env() { env "$@" bash "$root/scripts/release-restore-tag-ref.sh" >"$scratch/out" 2>&1; }
@@ -65,6 +69,10 @@ refused() {
 	grep -q -- "$reason" "$scratch/out" || { echo "error: refused for another reason than '$reason'" >&2; cat "$scratch/out" >&2; exit 1; }
 }
 cd "$scratch/checkout"
+# A clone does not inherit the source's identity; the fixture's annotated tags
+# need one even on a host with no global git identity.
+git config user.name 'Fixture Author'
+git config user.email 'fixture@example.invalid'
 git remote set-url origin https://github.com/3leaps/canonprims.git
 # Redirect only the fixture's fetch transport, not the origin identity check.
 git config url."$scratch/remote.git".insteadOf https://github.com/3leaps/canonprims.git
@@ -89,6 +97,29 @@ refused 'remote release tag is absent' run_env FIXTURE_API_MODE=fail CANONPRIMS_
 refused 'invalid JSON' run_env FIXTURE_API_MODE=garbage CANONPRIMS_RELEASE_TAG=v1.2.3
 refused 'named another ref' run_env FIXTURE_API_MODE=otherref CANONPRIMS_RELEASE_TAG=v1.2.3
 refused 'must be reached over https' run_env CANONPRIMS_GITHUB_API=http://api.example.invalid CANONPRIMS_RELEASE_TAG=v1.2.3
+# A workflow cannot redirect the lookup, even to another https host.
+refused 'not accepted under GitHub Actions' run_env GITHUB_ACTIONS=true CANONPRIMS_GITHUB_API=https://api.example.invalid CANONPRIMS_RELEASE_TAG=v1.2.3
+# The API names another annotated object at HEAD that the checkout already
+# holds; origin's ref still names the released object, so it is refused. A
+# configured tag fetch mapping must not move the local ref before the
+# comparison: start from the peeled ref actions/checkout leaves.
+git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
+git tag -a -m 'Local substitute' local-substitute HEAD
+substitute="$(git rev-parse refs/tags/local-substitute)"
+git update-ref refs/tags/v1.2.3 "$commit"
+refused "origin's tag object differs from the API answer" run_env FIXTURE_API_SHA="$substitute" CANONPRIMS_RELEASE_TAG=v1.2.3
+[[ "$(git rev-parse refs/tags/v1.2.3)" == "$commit" ]] || { echo 'error: a fetch mapping moved the local tag before the comparison' >&2; exit 1; }
+git tag -d local-substitute >/dev/null
+# With that mapping, an agreeing origin still restores the tag.
+restore v1.2.3 || { cat "$scratch/out" >&2; exit 1; }
+[[ "$(git rev-parse refs/tags/v1.2.3)" == "$object" ]]
+git config --unset-all remote.origin.fetch '\+refs/tags/\*:refs/tags/\*'
+# The object is local, but origin cannot be read: refused, not trusted from cache.
+git config --unset url."$scratch/remote.git".insteadOf
+git config url."$scratch/absent.git".insteadOf https://github.com/3leaps/canonprims.git
+refused 'origin release tag could not be fetched' restore v1.2.3
+git config --unset url."$scratch/absent.git".insteadOf
+git config url."$scratch/remote.git".insteadOf https://github.com/3leaps/canonprims.git
 cd "$root"
 
 # A different annotated object at the same commit is refused against the
@@ -107,7 +138,7 @@ git -C "$scratch/remote.git" update-ref refs/tags/v1.2.3 "$commit"
 	refused 'must be annotated' restore v1.2.3
 )
 # A tag targeting another commit is refused (the object is fetched with the
-# job token because the checkout does not hold it).
+# job token).
 printf 'changed\n' >>"$scratch/source/file"
 git -C "$scratch/source" add file
 git -C "$scratch/source" commit -qm 'another fixture commit'
@@ -117,4 +148,4 @@ git -C "$scratch/source" push -q --force origin main refs/tags/v1.2.3
 	cd "$scratch/checkout"
 	refused 'not the remote annotated tag at HEAD' restore v1.2.3
 )
-echo '[ok] tag restore: job-token API lookup (token on stdin, never argv), peeled-ref repair, and refusals for no token, absent, failed, malformed or misdirected answers, http, replaced, lightweight and other-commit tags'
+echo '[ok] tag restore: job-token API lookup (token on stdin, never argv), peeled-ref repair, and refusals for no token, absent, failed, malformed or misdirected answers, http, an API override under Actions, an origin that disagrees with the API or cannot be read, replaced, lightweight and other-commit tags'
