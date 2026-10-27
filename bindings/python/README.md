@@ -14,7 +14,9 @@ canonprims.check(b'{"a":2,"b":1}', limits)         # None, or raises Refusal
 canonprims.scheme_info()
 ```
 
-Input is bytes (any buffer); a `str` is encoded as UTF-8. An input with no
+Input is the bytes of any buffer exporter (`bytes`, `bytearray`, `memoryview`,
+`array`, `mmap`, ...); a `str` is encoded as UTF-8. Limits follow the spec: a
+negative limit behaves as 0. An input with no
 canonical form raises `canonprims.Refusal` (a `ValueError`) with a normative
 `code` and an informative byte `offset`. Nothing is repaired.
 

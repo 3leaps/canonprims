@@ -94,6 +94,7 @@ fn _canonprims(m: &Bound<'_, PyModule>) -> PyResult<()> {
         Limits::DEFAULT_MAX_OBJECT_MEMBERS,
     )?;
     m.add("DEFAULT_MAX_STRING_BYTES", Limits::DEFAULT_MAX_STRING_BYTES)?;
+    m.add("MAX_LIMIT", usize::MAX)?;
     m.add("VERSION", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

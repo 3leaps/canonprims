@@ -3,8 +3,9 @@
 
 A thin binding over the Rust ``canonprims-json`` crate. The same four verbs as
 the Rust crate and the Go package: :func:`canonicalize`, :func:`check`,
-:func:`digest` and :func:`scheme_info`. Input is ``bytes`` (any buffer); a
-``str`` is encoded as UTF-8 and nothing else. An input with no canonical form
+:func:`digest` and :func:`scheme_info`. Input is bytes from any object that
+exports a buffer (its raw bytes, in C order); a ``str`` is encoded as UTF-8 and
+nothing else. An input with no canonical form
 raises :class:`Refusal` carrying one normative code; nothing is repaired.
 """
 
@@ -28,7 +29,7 @@ __all__ = [
 
 __version__: Final[str] = _native.VERSION
 
-Input = Union[bytes, bytearray, memoryview, str]
+Input = Union[bytes, bytearray, memoryview, str]  # or any buffer exporter
 
 #: Every refusal code, in spec order. ``not_canonical`` comes only from check.
 CODES: Final = (
@@ -63,8 +64,10 @@ class Limits:
     """Explicit resource limits; every verb takes one.
 
     Exceeding a limit is a ``too_large`` or ``too_deep`` refusal. A limit of 0
-    allows none of that thing. The defaults match every other canonprims
-    implementation.
+    allows none of that thing; a negative limit behaves as 0 (Python ints are
+    signed), and a limit above the platform's ``usize`` range behaves as that
+    maximum. Each limit must be an ``int`` (not ``bool``). The defaults match
+    every other canonprims implementation.
     """
 
     max_bytes: int = _native.DEFAULT_MAX_BYTES
@@ -75,11 +78,19 @@ class Limits:
     def __post_init__(self) -> None:
         for name in ("max_bytes", "max_depth", "max_object_members", "max_string_bytes"):
             value = getattr(self, name)
-            if type(value) is not int or value < 0:
-                raise ValueError(f"Limits.{name} must be a non-negative int, got {value!r}")
+            if type(value) is not int:
+                raise TypeError(f"Limits.{name} must be an int, got {value!r}")
 
     def _args(self) -> tuple[int, int, int, int]:
-        return (self.max_bytes, self.max_depth, self.max_object_members, self.max_string_bytes)
+        def clamp(value: int) -> int:
+            return min(max(value, 0), _native.MAX_LIMIT)
+
+        return (
+            clamp(self.max_bytes),
+            clamp(self.max_depth),
+            clamp(self.max_object_members),
+            clamp(self.max_string_bytes),
+        )
 
 
 @dataclass(frozen=True)
@@ -95,9 +106,12 @@ class SchemeInfo:
 def _bytes(data: Input) -> bytes:
     if isinstance(data, str):
         return data.encode("utf-8")
-    if isinstance(data, (bytes, bytearray, memoryview)):
-        return bytes(data)
-    raise TypeError(f"input must be bytes-like or str, not {type(data).__name__}")
+    try:
+        view = memoryview(data)
+    except TypeError:
+        raise TypeError(f"input must be bytes-like or str, not {type(data).__name__}") from None
+    with view:
+        return view.tobytes()
 
 
 def _limits(limits: Limits) -> tuple[int, int, int, int]:
