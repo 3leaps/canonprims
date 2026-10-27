@@ -40,9 +40,21 @@ if bad:
 PY
 
 target_dir="${CARGO_TARGET_DIR:-${root}/target}/wasm"
-CARGO_TARGET_DIR="${target_dir}" cargo build --quiet --locked --release \
+# Panic locations embed source paths; map the checkout, the Cargo home and
+# the rustup home (a toolchain with rust-src names its own library sources)
+# to fixed names so the module carries no build-host path.
+physical_root="$(pwd -P)"
+cargo_home="${CARGO_HOME:-${HOME}/.cargo}"
+rustup_home="${RUSTUP_HOME:-${HOME}/.rustup}"
+CARGO_TARGET_DIR="${target_dir}" \
+  RUSTFLAGS="--remap-path-prefix=${physical_root}=/canonprims --remap-path-prefix=${cargo_home}=/cargo --remap-path-prefix=${rustup_home}=/rustup" \
+  cargo build --quiet --locked --release \
   --manifest-path "${pkg}/Cargo.toml" --target wasm32-unknown-unknown
 module="${target_dir}/wasm32-unknown-unknown/release/canonprims_wasm.wasm"
+if LC_ALL=C grep -aqF -e "${physical_root}" -e "${cargo_home}" -e "${rustup_home}" -e "${HOME}" "${module}"; then
+  echo "ts-check: the module embeds a build-host path" >&2
+  exit 1
+fi
 node --input-type=module - "${module}" <<'JS'
 import { readFileSync } from "node:fs";
 const m = new WebAssembly.Module(readFileSync(process.argv[2]));
