@@ -5,8 +5,10 @@
 # The tag object is resolved through the GitHub REST API with the job token
 # (GITHUB_TOKEN, read-only in every workflow), not by anonymous `git ls-remote`,
 # so the lookup works on a private repository without persisting checkout
-# credentials. The release workflows run no GitHub CLI, so this uses curl. The
-# object is then made the runner-local ref and bound to HEAD.
+# credentials. The release workflows run no GitHub CLI, so this uses curl.
+# origin's tag ref is then fetched with the same token, even when the object is
+# already local, and must name the object the API answered before it becomes
+# the runner-local ref and is bound to HEAD.
 set -euo pipefail
 
 die() {
@@ -22,6 +24,10 @@ case "$(git config --get remote.origin.url)" in
 "https://github.com/$repo" | "https://github.com/$repo.git") ;;
 *) die 'unexpected release origin' ;;
 esac
+# The API override exists for local tests; a workflow always asks GitHub.
+if [[ -n "${GITHUB_ACTIONS:-}" && -n "${CANONPRIMS_GITHUB_API+x}" ]]; then
+    die 'CANONPRIMS_GITHUB_API is not accepted under GitHub Actions'
+fi
 api="${CANONPRIMS_GITHUB_API:-https://api.github.com}"
 [[ "$api" == https://* ]] || die 'the GitHub API must be reached over https'
 
@@ -41,22 +47,21 @@ if [[ -n "${CANONPRIMS_EXPECTED_TAG_OBJECT+x}" ]]; then
         die 'remote tag object differs from validated object'
 fi
 
-# A full-history checkout already holds the tag object. Otherwise fetch it with
-# the job token for this one command only; checkout credentials stay
-# unpersisted. Either way only the runner-local ref changes, and the checks
-# below bind it to the API answer.
-if [[ "$(git cat-file -t "$remote_object" 2>/dev/null || true)" == tag ]]; then
-    git update-ref "refs/tags/$tag" "$remote_object"
-else
-    # The header travels in the environment, not argv, and its encoded form is
-    # masked because the runner masks only the raw token.
-    auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
-    [[ -z "${GITHUB_ACTIONS:-}" ]] || echo "::add-mask::$auth"
-    GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
-        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
-        git fetch --quiet --no-tags origin "+refs/tags/$tag:refs/tags/$tag"
-fi
+# Ask origin as well, even when a full-history checkout already holds the
+# object, so the API answer and origin's ref must agree. The fetch writes only
+# FETCH_HEAD; the runner-local ref changes after the comparison. The job token
+# serves this one command; checkout credentials stay unpersisted.
+# The header travels in the environment, not argv, and its encoded form is
+# masked because the runner masks only the raw token.
+auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+[[ -z "${GITHUB_ACTIONS:-}" ]] || echo "::add-mask::$auth"
+GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
+    GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
+    git fetch --quiet --no-tags origin "refs/tags/$tag" || die 'origin release tag could not be fetched'
+[[ "$(git rev-parse --verify --quiet FETCH_HEAD)" == "$remote_object" ]] ||
+    die "origin's tag object differs from the API answer"
+git update-ref "refs/tags/$tag" "$remote_object"
 [[ "$(git rev-parse "refs/tags/$tag")" == "$remote_object" &&
     "$(git cat-file -t "refs/tags/$tag")" == tag &&
     "$(git rev-parse "refs/tags/$tag^{}")" == "$(git rev-parse HEAD)" ]] ||
