@@ -67,6 +67,10 @@ refused() {
 	grep -q -- "$reason" "$scratch/out" || { echo "error: refused for another reason than '$reason'" >&2; cat "$scratch/out" >&2; exit 1; }
 }
 cd "$scratch/checkout"
+# A clone does not inherit the source's identity; the fixture's annotated tags
+# need one even on a host with no global git identity.
+git config user.name 'Fixture Author'
+git config user.email 'fixture@example.invalid'
 git remote set-url origin https://github.com/3leaps/canonprims.git
 # Redirect only the fixture's fetch transport, not the origin identity check.
 git config url."$scratch/remote.git".insteadOf https://github.com/3leaps/canonprims.git
@@ -94,13 +98,20 @@ refused 'must be reached over https' run_env CANONPRIMS_GITHUB_API=http://api.ex
 # A workflow cannot redirect the lookup, even to another https host.
 refused 'not accepted under GitHub Actions' run_env GITHUB_ACTIONS=true CANONPRIMS_GITHUB_API=https://api.example.invalid CANONPRIMS_RELEASE_TAG=v1.2.3
 # The API names another annotated object at HEAD that the checkout already
-# holds; origin's ref still names the released object, so it is refused and the
-# local ref is untouched.
+# holds; origin's ref still names the released object, so it is refused. A
+# configured tag fetch mapping must not move the local ref before the
+# comparison: start from the peeled ref actions/checkout leaves.
+git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
 git tag -a -m 'Local substitute' local-substitute HEAD
 substitute="$(git rev-parse refs/tags/local-substitute)"
+git update-ref refs/tags/v1.2.3 "$commit"
 refused "origin's tag object differs from the API answer" run_env FIXTURE_API_SHA="$substitute" CANONPRIMS_RELEASE_TAG=v1.2.3
-[[ "$(git rev-parse refs/tags/v1.2.3)" == "$object" ]]
+[[ "$(git rev-parse refs/tags/v1.2.3)" == "$commit" ]] || { echo 'error: a fetch mapping moved the local tag before the comparison' >&2; exit 1; }
 git tag -d local-substitute >/dev/null
+# With that mapping, an agreeing origin still restores the tag.
+restore v1.2.3 || { cat "$scratch/out" >&2; exit 1; }
+[[ "$(git rev-parse refs/tags/v1.2.3)" == "$object" ]]
+git config --unset-all remote.origin.fetch '\+refs/tags/\*:refs/tags/\*'
 # The object is local, but origin cannot be read: refused, not trusted from cache.
 git config --unset url."$scratch/remote.git".insteadOf
 git config url."$scratch/absent.git".insteadOf https://github.com/3leaps/canonprims.git

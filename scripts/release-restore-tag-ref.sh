@@ -49,7 +49,9 @@ fi
 
 # Ask origin as well, even when a full-history checkout already holds the
 # object, so the API answer and origin's ref must agree. The fetch writes only
-# FETCH_HEAD; the runner-local ref changes after the comparison. The job token
+# FETCH_HEAD (--refmap= drops any configured fetch mapping, which would
+# otherwise update local tags); the runner-local ref changes after the
+# comparison. The job token
 # serves this one command; checkout credentials stay unpersisted.
 # The header travels in the environment, not argv, and its encoded form is
 # masked because the runner masks only the raw token.
@@ -58,7 +60,7 @@ auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
 GIT_CONFIG_COUNT=1 \
     GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
     GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
-    git fetch --quiet --no-tags origin "refs/tags/$tag" || die 'origin release tag could not be fetched'
+    git fetch --quiet --no-tags --refmap= origin "refs/tags/$tag" || die 'origin release tag could not be fetched'
 [[ "$(git rev-parse --verify --quiet FETCH_HEAD)" == "$remote_object" ]] ||
     die "origin's tag object differs from the API answer"
 git update-ref "refs/tags/$tag" "$remote_object"
