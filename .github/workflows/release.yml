@@ -60,6 +60,7 @@ jobs:
       - name: Restore the annotated tag and verify it against the committed pin
         id: identity
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -134,6 +135,7 @@ jobs:
 
       - name: Confirm annotated tag identity
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
@@ -203,6 +205,7 @@ jobs:
 
       - name: Confirm annotated tag identity
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
@@ -244,6 +247,7 @@ jobs:
 
       - name: Confirm annotated tag identity
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
@@ -290,6 +294,7 @@ jobs:
 
       - name: Confirm annotated tag identity
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}

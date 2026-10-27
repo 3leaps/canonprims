@@ -55,6 +55,7 @@ jobs:
 
       - name: Restore the annotated tag and verify it against the committed pin
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
