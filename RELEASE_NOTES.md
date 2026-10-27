@@ -6,9 +6,9 @@ The latest three releases, newest first. The complete history is in
 
 ---
 
-## v0.1.0 - 2026-10-26
+## v0.1.1 - 2026-10-27
 
-The first release: the RFC 8785 JSON Canonicalization Scheme in Rust and in
+The first published release: the RFC 8785 JSON Canonicalization Scheme in Rust and in
 pure Go, gated against one conformance corpus and in byte-for-byte agreement.
 
 - Rust crates `canonprims-core` and `canonprims-json` on crates.io.
@@ -16,6 +16,7 @@ pure Go, gated against one conformance corpus and in byte-for-byte agreement.
   only and cgo-free.
 - The `canon` command for linux amd64/arm64, darwin arm64 and windows
   amd64/arm64.
-- One signed tag, `v0.1.0`, for the crates and the Go module.
+- One signed tag, `v0.1.1`, for the crates and the Go module. (A `v0.1.0`
+  tag exists but was never released.)
 
-Details: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
+Details: [docs/releases/v0.1.1.md](docs/releases/v0.1.1.md).

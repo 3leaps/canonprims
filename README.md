@@ -31,8 +31,8 @@ checker (see Development).
 
 | Language | Package | Status |
 | --- | --- | --- |
-| Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.0 |
-| Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.0 |
+| Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.1 |
+| Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.1 |
 | TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation | planned |
 | Python | `canonprims` (PyPI), from the Rust implementation | planned |
 
@@ -40,7 +40,7 @@ There is no TypeScript or Python binding yet.
 
 ## Status
 
-Pre-release (0.1.0 in development). The API may change before the first tag.
+0.1.1 is the first release. While the version is 0.x the API may still change between minor releases.
 
 ## Use
 
@@ -55,7 +55,7 @@ $ canon jcs --check fixture.json    # exit 0 only if already canonical
 $ canon info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
 $ canon version --extended
-{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.0"}
+{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.1"}
 ```
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:

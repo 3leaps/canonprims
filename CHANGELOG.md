@@ -7,8 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-26
+## [0.1.1] - 2026-10-27
 
+The first published release. A `v0.1.0` tag was created but never released:
+its tag workflow could not read the tag on a private repository. Everything
+listed here ships in 0.1.1.
+
+- The release workflow looks up its tag through the GitHub API with the
+  read-only job token, so it runs on a private repository
 - RFC 8785 JSON Canonicalization Scheme (`jcs/rfc8785`) over a strict I-JSON
   loader, in Rust (`canonprims-core`, `canonprims-json`) and in pure Go
   (`github.com/3leaps/canonprims/canon`), with the same refusal codes and explicit limits
@@ -26,5 +32,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Public-surface checks: a vocabulary-free content check of tracked files in
   `make check`, and a maintainer-only limensafe scan in `make pr-final`
 
-[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/3leaps/canonprims/releases/tag/v0.1.0
+[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/3leaps/canonprims/releases/tag/v0.1.1
