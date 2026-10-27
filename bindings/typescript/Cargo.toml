@@ -1,0 +1,33 @@
+# The WebAssembly module behind the TypeScript package. A workspace of its own,
+# outside crates/, so it is never a release crate and its build profile does
+# not touch the published crates.
+[package]
+name = "canonprims-wasm"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.88.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/3leaps/canonprims"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+canonprims-json = { path = "../../crates/canonprims-json" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Exporting a symbol from a cdylib (`#[unsafe(no_mangle)]`-style attributes)
+# counts as unsafe code; `deny` lets each export carry a scoped allow. There is
+# no other unsafe code: memory is exchanged through owned buffers, never raw
+# pointers dereferenced in Rust. scripts/ts-check.sh refuses any other allow.
+[lints.rust]
+unsafe_code = "deny"
+
+[workspace]

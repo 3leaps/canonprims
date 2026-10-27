@@ -33,11 +33,12 @@ checker (see Development).
 | --- | --- | --- |
 | Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.1 |
 | Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.1 |
-| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation | planned |
+| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation (WebAssembly) | in development (`bindings/typescript`); not yet published |
 | Python | `canonprims` (PyPI), from the Rust implementation | in development (`bindings/python`); not yet published |
 
-There is no TypeScript binding yet. The Python binding builds from source
-(see `bindings/python/README.md`) and passes the same corpus; it is not on PyPI yet.
+The Python and TypeScript bindings build from source (see
+`bindings/python/README.md` and `bindings/typescript/README.md`) and pass the
+same corpus; neither is published to PyPI or npm yet.
 
 ## Status
 
@@ -121,6 +122,7 @@ make corpus       # regenerate the corpus from scripts/canonical-json-corpus.py
 make doctor       # host tool versions against the recommended minimums
 make pr-final     # before a PR: check plus the maintainer's public-surface scan
 make python-check # Python binding: build the wheel, run its tests and corpus, agree with Rust
+make ts-check     # TypeScript binding: build the wasm package, run its tests and corpus, agree with Rust
 ```
 
 Requirements:
@@ -133,6 +135,9 @@ Requirements:
 - For `make python-check`: Python 3.10 or later with `venv` and `pip`;
   it installs the hash-pinned build backend in
   `config/python-build-requirements.txt` into a throwaway environment.
+- For `make ts-check`: the `wasm32-unknown-unknown` Rust target, Node.js 20
+  or later and npm; it installs the TypeScript compiler pinned in
+  `bindings/typescript/package-lock.json`.
 
 `.goneat/tools.yaml` declares a recommended minimum version for each host tool
 the checks and the release ceremony run (git, gh, jq, Python, gpg, minisign,

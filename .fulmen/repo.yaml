@@ -13,6 +13,6 @@ surfaces: [library, cli]
 bindings:
   rust: shipped         # canonprims-core, canonprims-json (crates.io)
   go: shipped           # github.com/3leaps/canonprims/canon
-  typescript: planned   # from the Rust implementation (wasm)
+  typescript: planned   # bindings/typescript (wasm32, no imports); built and gated, not yet published
   python: planned       # bindings/python (PyO3/maturin, abi3); built and gated, not yet published
 extensions: []

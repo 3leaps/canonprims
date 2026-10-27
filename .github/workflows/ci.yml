@@ -187,6 +187,42 @@ jobs:
       - name: Python binding
         run: make python-check PYTHON=python
 
+  typescript:
+    # The TypeScript binding (bindings/typescript): build the WebAssembly
+    # module (one artifact for every platform), pack the package with the
+    # lockfile-pinned TypeScript, install the tarball and test it against the
+    # full corpus, and compare its results with Rust (scripts/ts-check.sh). The
+    # package runs on the Node.js floor (20) and the pinned current version.
+    name: typescript (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20.20.2", "22.23.4"]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: TypeScript binding
+        run: make ts-check
+
   workflow-lint:
     name: workflow-lint
     runs-on: ubuntu-latest

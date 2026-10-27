@@ -13,6 +13,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   wheel, runs its tests and the `canonical-json/v0` corpus against the
   installed package, and compares its results with Rust on the corpus and the
   crosscheck seeds. Not yet published
+- TypeScript binding `@3leaps/canonprims` (`bindings/typescript`): one
+  WebAssembly module with no imports, embedded in an ES module with no runtime
+  dependencies, for Node.js 20+, Deno, Bun and browsers. The same four verbs
+  over `Uint8Array` with explicit limits, refusals as `Refusal` with the
+  normative code. `make ts-check` packs the package, installs the tarball, runs
+  its tests and the corpus against it, and compares its results with Rust on
+  the corpus and the crosscheck seeds. Not yet published
 
 ## [0.1.1] - 2026-10-27
 

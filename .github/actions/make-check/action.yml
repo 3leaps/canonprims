@@ -37,6 +37,8 @@ runs:
       with:
         toolchain: ${{ inputs.rust-toolchain }}
         components: rustfmt, clippy
+        # make check lints the TypeScript binding's WebAssembly crate.
+        targets: wasm32-unknown-unknown
 
     - name: Verify native host and toolchain
       shell: bash
