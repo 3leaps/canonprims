@@ -1,0 +1,27 @@
+[build-system]
+requires = ["maturin>=1.15,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "canonprims"
+version = "0.1.1"
+description = "Canonical serialization for structured data: RFC 8785 JSON over a strict I-JSON loader"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+keywords = ["canonicalization", "rfc8785", "jcs", "json"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/3leaps/canonprims"
+
+[tool.maturin]
+python-source = "python"
+module-name = "canonprims._canonprims"
+features = []
