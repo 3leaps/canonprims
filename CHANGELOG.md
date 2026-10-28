@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Python binding `canonprims` (`bindings/python`, PyO3, abi3 for CPython 3.10
+  and later): the four verbs over bytes with explicit `Limits`, refusals as
+  `canonprims.Refusal` with the normative code. `make python-check` builds the
+  wheel, runs its tests and the `canonical-json/v0` corpus against the
+  installed package, and compares its results with Rust on the corpus and the
+  crosscheck seeds. Not yet published
+
 ## [0.1.1] - 2026-10-27
 
 The first published release. A `v0.1.0` tag was created but never released:

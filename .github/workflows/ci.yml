@@ -103,6 +103,90 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           node-version: ${{ env.NODE_VERSION }}
 
+  python:
+    # The Python binding (bindings/python): build the abi3 wheel with the
+    # hash-pinned maturin, test the installed wheel against the full corpus,
+    # and compare its results with Rust (scripts/python-check.sh). The floor
+    # (3.10) and a current CPython both run on x86_64 Linux.
+    name: python (${{ matrix.target }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            python: "3.10"
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            python: "3.14"
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            python: "3.14"
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            python: "3.14"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Python binding
+        run: make python-check PYTHON=python
+
+  python-arm64:
+    name: python (${{ matrix.target }}, ${{ matrix.python }})
+    # Same-repo only: fork PRs cannot use organization larger runners.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest-arm64-s
+            target: aarch64-unknown-linux-gnu
+            python: "3.14"
+          - runner: windows-latest-arm64-s
+            target: aarch64-pc-windows-msvc
+            python: "3.14"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Python binding
+        run: make python-check PYTHON=python
+
   workflow-lint:
     name: workflow-lint
     runs-on: ubuntu-latest

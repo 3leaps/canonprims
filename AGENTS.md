@@ -29,6 +29,7 @@ generated input.
 | Rust tests | `make test-rust` |
 | Go tests | `make test-go` |
 | Agreement | `make crosscheck` |
+| Python binding | `make python-check` |
 | Corpus | `make corpus` / `make corpus-check` |
 
 ## Session protocol
@@ -100,5 +101,7 @@ MIT OR Apache-2.0. All dependencies must stay permissively licensed.
 | `crates/canonprims-cli` | The `canon` command |
 | `go.mod`, `canon/` | Pure-Go twin (root module, standard library only) |
 | `scripts/crosscheck.sh` | Rust/Go byte-for-byte agreement |
+| `bindings/python` | Python binding (PyO3); its own Cargo workspace, never a release crate |
+| `scripts/python-check.sh` | Python wheel, tests, corpus and Rust agreement |
 | `VERSION` | Version SSOT |
 | `.fulmen/repo.yaml` | Repository class declaration (prims, Profile B, leaf) |
