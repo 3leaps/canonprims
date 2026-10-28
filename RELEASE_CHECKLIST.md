@@ -1,8 +1,8 @@
 # Release Checklist
 
 How a maintainer cuts a canonprims release. A release is one signed annotated
-tag, `vX.Y.Z`, at a commit of `main`; it releases the Rust crates and the root
-Go module together ([ADR-0001](docs/decisions/ADR-0001-release-identity-and-tags.md)); the
+tag, `vX.Y.Z`, at a commit of `main`; it releases the Rust crates, the root
+Go module, the Python wheels and the npm package together ([ADR-0001](docs/decisions/ADR-0001-release-identity-and-tags.md)); the
 signing material and the trust rules are in
 [docs/security/README.md](docs/security/README.md).
 
@@ -114,9 +114,10 @@ tag verification checks the pin in the tagged commit. To change one:
 ## 3. Release workflow
 
 - [ ] The tag-triggered `Release` workflow is green: the tag verified, the
-  committed anchors checked by the pinned decernor, five CLI archives, the
-  source archive, the SBOM and the release identity uploaded as workflow
-  artifacts. `make release-download` rebuilds the source archive from the
+  committed anchors checked by the pinned decernor, five CLI archives, five
+  Python wheels (each installed alone and tested on its platform), the npm
+  package (installed from its tarball and tested), the source archive, the
+  SBOM and the release identity uploaded as workflow artifacts. `make release-download` rebuilds the source archive from the
   verified commit and refuses one that differs.
 
 - [ ] Record in `docs/releases/vX.Y.Z.md` (in a follow-up commit after the
@@ -136,6 +137,8 @@ commit as inert git objects and never run its scripts.
   draft, sign both manifests, verify and upload. The release stays a draft.
   - Expected assets: `canon-X.Y.Z-{linux-amd64,linux-arm64,darwin-arm64}.tar.gz`,
     `canon-X.Y.Z-{windows-amd64,windows-arm64}.zip`,
+    `canonprims-X.Y.Z-cp310-abi3-{manylinux_2_17_x86_64.manylinux2014_x86_64,manylinux_2_17_aarch64.manylinux2014_aarch64,macosx_11_0_arm64,win_amd64,win_arm64}.whl`,
+    `3leaps-canonprims-X.Y.Z.tgz`,
     `canonprims-X.Y.Z-src.tar.gz`, `sbom-X.Y.Z.cdx.json`,
     `LICENSE-MIT`, `LICENSE-APACHE`, `release-notes-vX.Y.Z.md`,
     `expected-fingerprints.{txt,ndjson}`, `canonprims-minisign.pub`,
@@ -182,8 +185,36 @@ For each crate in order (`CRATE=canonprims-core`, then
   both the index checksum and the downloaded published archive against the
   verified digest. A crate already on the index is refused.
 
+## 5b. PyPI and npm
+
+The registries receive exactly the signed files of the published GitHub
+release; nothing is rebuilt. Until trusted publishing is configured these are
+maintainer uploads with a scoped token kept outside the repository (a first
+upload needs an account- or organization-wide token, revoked afterwards: a
+project-scoped token can only be made once the project exists).
+
+- [ ] Download the published release into an empty directory outside the
+  repository and verify it there: `minisign -Vm SHA256SUMS -p
+  canonprims-minisign.pub` (the committed pin, compared with
+  `docs/security/canonprims-minisign.pub` at the tag), `gpg --verify
+  SHA256SUMS.asc SHA256SUMS` by the committed signing subkey, then
+  `sha256sum --check --ignore-missing SHA256SUMS` lists every wheel and the
+  npm tarball as OK.
+- [ ] PyPI: `twine upload` the five `canonprims-X.Y.Z-cp310-abi3-*.whl` files
+  and nothing else. The project lands in the `3leaps` organization.
+- [ ] npm: `npm publish 3leaps-canonprims-X.Y.Z.tgz --access public`. The
+  tarball, not a directory: npm must not repack it.
+- [ ] Each registry serves the signed bytes: the SHA-256 of every file on
+  `https://pypi.org/pypi/canonprims/X.Y.Z/json` (`urls[].digests.sha256`)
+  equals its `SHA256SUMS` line, and `npm view @3leaps/canonprims@X.Y.Z
+  dist.integrity` equals `sha512-` plus the base64 of the tarball's SHA-512
+  (its `SHA512SUMS` line).
+- [ ] Revoke a first-publication token.
+
 ## 6. After the release
 
 - [ ] `go list -m github.com/3leaps/canonprims@vX.Y.Z` resolves.
+- [ ] `pip install canonprims==X.Y.Z` and `npm install @3leaps/canonprims@X.Y.Z`
+  in fresh environments import and canonicalize `{"b":1,"a":2}`.
 - [ ] Someone other than the publisher verifies the published release: the
   tag, the anchors, the manifests and every digest.

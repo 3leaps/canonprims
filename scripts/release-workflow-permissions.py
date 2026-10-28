@@ -23,6 +23,10 @@ import yaml  # noqa: E402
 ACTIONS = {"actions/checkout", "actions/upload-artifact", "dtolnay/rust-toolchain"}
 RUNNERS = {"ubuntu-24.04", "macos-15", "windows-2025", "ubuntu-latest-arm64-s", "windows-latest-arm64-s"}
 SBOM_IMAGE = "ghcr.io/fulmenhq/sbom-tools@sha256:954267f9aca809b89af42bb97471a3c4d7b93c385c5625829b244b17b252fbde"
+# PyPA manylinux2014 images (glibc 2.17) for the Linux wheels, tag
+# 2026.10.20-1 of each, pinned by digest.
+MANYLINUX_AMD64 = "quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6"
+MANYLINUX_ARM64 = "quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e"
 # Each must be the start of an executable line in the verify job.
 MANDATORY = (
     '(cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")',
@@ -44,7 +48,7 @@ FORBIDDEN_COMMANDS = re.compile(
 # What each reviewed workflow must contain beyond the shared rules: its
 # container images, exactly, and the artifact boundary its verify job writes.
 PROFILES = {
-    "release.yml": {"images": [SBOM_IMAGE], "boundary": "release-identity.json"},
+    "release.yml": {"images": [MANYLINUX_AMD64, MANYLINUX_ARM64, SBOM_IMAGE], "boundary": "release-identity.json"},
     "crates-verify.yml": {"images": [], "boundary": "scripts/ci-crate-verify.sh"},
 }
 SECRET = re.compile(r"(?i)\bsecrets\b|CARGO_REGISTRY_TOKEN|NODE_AUTH_TOKEN")
@@ -241,6 +245,12 @@ def mutations(text):
         sub("    needs: verify\n", ""),
         sub("sbom-tools@sha256:954267", "sbom-tools@sha256:000000"),
         sub(SBOM_IMAGE, "ghcr.io/fulmenhq/sbom-tools:latest"),
+        # Each wheel image: another digest, a moving tag, or the two swapped.
+        sub("manylinux2014_x86_64@sha256:d6b534", "manylinux2014_x86_64@sha256:000000"),
+        sub(MANYLINUX_AMD64, "quay.io/pypa/manylinux2014_x86_64:latest"),
+        sub("manylinux2014_aarch64@sha256:d41ea3", "manylinux2014_aarch64@sha256:000000"),
+        sub(MANYLINUX_ARM64, "quay.io/pypa/manylinux2014_aarch64:latest"),
+        text.replace(MANYLINUX_AMD64, "@@AMD64@@").replace(MANYLINUX_ARM64, MANYLINUX_AMD64).replace("@@AMD64@@", MANYLINUX_ARM64),
         # Decoded escapes, flow-style container, other gh writes.
         sub(first_runs_on, first_runs_on + '    env:\n      "CARGO_REGISTRY_TO\\u004bEN": "${{ secrets[\'X\'] }}"\n'),
         sub(run, run + '          "cargo\\u0020publish --no-verify -p canonprims-core"\n'.replace("\\u0020", " ").replace('"', "")),

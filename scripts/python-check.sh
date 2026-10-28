@@ -41,16 +41,9 @@ RUSTFLAGS="--remap-path-prefix=$(pwd -P)=/canonprims --remap-path-prefix=${CARGO
   --manifest-path bindings/python/Cargo.toml --interpreter "${venv_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
 # The extension must carry no build-host path (panic locations are remapped).
-"${venv_python}" -I - "${wheels[0]}" "$(pwd -P)" "${CARGO_HOME:-${HOME}/.cargo}" "${RUSTUP_HOME:-${HOME}/.rustup}" "${HOME}" <<'PY'
-import sys, zipfile
-wheel, *paths = sys.argv[1:]
-with zipfile.ZipFile(wheel) as z:
-    for name in z.namelist():
-        data = z.read(name)
-        for p in paths:
-            if p.encode() in data:
-                raise SystemExit(f"python-check: {name} embeds a build-host path")
-PY
+"${venv_python}" -I scripts/host-path-check.py "${wheels[0]}" \
+  "$(pwd -P)" "${CARGO_HOME:-${HOME}/.cargo}" "${RUSTUP_HOME:-${HOME}/.rustup}" "${HOME}" ||
+  { echo "python-check: the wheel embeds a build-host path" >&2; exit 1; }
 [ "${#wheels[@]}" -eq 1 ] && [ -f "${wheels[0]}" ] || { echo "python-check: expected one wheel" >&2; exit 1; }
 case "${wheels[0]##*/}" in *-cp310-abi3-*) ;; *) echo "python-check: wheel is not abi3 for 3.10: ${wheels[0]##*/}" >&2; exit 1 ;; esac
 "${venv_python}" -I -m pip install --quiet --disable-pip-version-check --no-index --no-deps "${wheels[0]}"

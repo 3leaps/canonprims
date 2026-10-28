@@ -50,6 +50,17 @@ case "$1 $2" in
    cli-*)
     suffix="${name#cli-}"; ext=tar.gz; [[ "$suffix" == windows-* ]] && ext=zip
     [[ "$suffix" != "${MISSING_SUFFIX:-}" ]] && printf fixture > "$dir/canon-1.2.3-$suffix.$ext" || true ;;
+   wheel-*)
+    suffix="${name#wheel-}"
+    case "$suffix" in
+     linux-amd64) tag=manylinux_2_17_x86_64.manylinux2014_x86_64 ;;
+     linux-arm64) tag=manylinux_2_17_aarch64.manylinux2014_aarch64 ;;
+     darwin-arm64) tag=macosx_11_0_arm64 ;;
+     windows-amd64) tag=win_amd64 ;;
+     windows-arm64) tag=win_arm64 ;;
+    esac
+    [[ "wheel-$suffix" != "${MISSING_ARTIFACT:-}" ]] && printf fixture > "$dir/canonprims-1.2.3-cp310-abi3-$tag.whl" || true ;;
+   npm) [[ npm != "${MISSING_ARTIFACT:-}" ]] && printf fixture > "$dir/3leaps-canonprims-1.2.3.tgz" || true ;;
    sbom) printf fixture > "$dir/sbom-1.2.3.cdx.json" ;;
    source)
     git -C "$FIXTURE_REPO" archive --format=tar.gz --prefix=canonprims-1.2.3/ -o "$dir/canonprims-1.2.3-src.tar.gz" "$FIXTURE_COMMIT"
@@ -105,6 +116,10 @@ fetch >/dev/null
 fail env BAD_OBJECT=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 fail env ATTEMPT_MOVED=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 fail env MISSING_SUFFIX=windows-arm64 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
+# A missing wheel or npm package is refused like a missing CLI archive.
+for missing in wheel-linux-arm64 wheel-windows-arm64 npm; do
+	fail env MISSING_ARTIFACT="$missing" bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
+done
 fail env EXTRA=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 fail env MULTIPLE=1 bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"
 fail env -u CANONPRIMS_RELEASE_ANCHOR_FILE bash -c 'rm -rf "$1"; "$2" v1.2.3 "$1"' _ "$scratch/bad" "$fixture/scripts/release-fetch-ci-artifacts.sh"

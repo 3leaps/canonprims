@@ -2,6 +2,7 @@ check-registry-config
 content-check
 deps-check
 doctor
+host-path-check
 jq-portability
 release-anchors
 release-assets
