@@ -1,5 +1,6 @@
 # SHA-256 of CI tool archives, checked against each project's published
-# checksums before pinning. Fetched only by scripts/ci-install-tools.sh.
+# checksums before pinning. Fetched only by scripts/ci-install-tools.sh and,
+# for rustup-init, scripts/build-wheel.sh.
 #
 # goneat v0.6.1        https://github.com/fulmenhq/goneat/releases/tag/v0.6.1
 # cargo-deny 0.20.2    https://github.com/EmbarkStudios/cargo-deny/releases/tag/0.20.2
@@ -13,3 +14,7 @@ ad19452aa2875d7cafd539ad9031573cabb2f4fb5ed93b23a2bfc53884540c58  goneat_v0.6.1_
 fe67d82a10d8597a3549364cb733a3f9cc1bfff9031b7ae46384a9f2a72090c3  cargo-deny-0.20.2-aarch64-apple-darwin.tar.gz
 975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc  cargo-deny-0.20.2-x86_64-pc-windows-msvc.tar.gz
 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint_1.7.12_linux_amd64.tar.gz
+# rustup-init 1.29.1   https://static.rust-lang.org/rustup/archive/1.29.1/ (published .sha256 per target)
+#                      Installs the pinned Rust toolchain inside the manylinux wheel-build containers.
+dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71  rustup-init-1.29.1-x86_64-unknown-linux-gnu
+15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433  rustup-init-1.29.1-aarch64-unknown-linux-gnu

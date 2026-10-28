@@ -61,10 +61,8 @@ CARGO_TARGET_DIR="${target_dir}" \
   cargo build --quiet --locked --release \
   --manifest-path "${pkg}/Cargo.toml" --target wasm32-unknown-unknown
 module="${target_dir}/wasm32-unknown-unknown/release/canonprims_wasm.wasm"
-if LC_ALL=C grep -aqF -e "${physical_root}" -e "${cargo_home}" -e "${rustup_home}" -e "${HOME}" "${module}"; then
-  echo "ts-check: the module embeds a build-host path" >&2
-  exit 1
-fi
+"${python}" -I scripts/host-path-check.py "${module}" "${physical_root}" "${cargo_home}" "${rustup_home}" "${HOME}" ||
+  { echo "ts-check: the module embeds a build-host path" >&2; exit 1; }
 node --input-type=module - "${module}" <<'JS'
 import { readFileSync } from "node:fs";
 const m = new WebAssembly.Module(readFileSync(process.argv[2]));

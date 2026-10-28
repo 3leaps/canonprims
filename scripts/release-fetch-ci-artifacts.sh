@@ -47,6 +47,10 @@ jq -e --arg commit "$commit" --arg tag "$tag" \
 for suffix in linux-amd64 linux-arm64 darwin-arm64 windows-amd64 windows-arm64; do
     release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name "cli-$suffix" --dir "$scratch/download/cli-$suffix"
 done
+for suffix in linux-amd64 linux-arm64 darwin-arm64 windows-amd64 windows-arm64; do
+    release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name "wheel-$suffix" --dir "$scratch/download/wheel-$suffix"
+done
+release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name npm --dir "$scratch/download/npm"
 release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name sbom --dir "$scratch/download/sbom"
 release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name source --dir "$scratch/download/source"
 release_gh run download "$run" --repo "$CANONPRIMS_REPOSITORY" --name release-identity --dir "$scratch/download/identity"

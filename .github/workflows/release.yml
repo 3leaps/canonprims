@@ -3,7 +3,8 @@
 # On a v* tag: verify the release tag (vX.Y.Z) against
 # the public pin committed in the tagged commit, check the committed anchors
 # with the digest-pinned checker, then build the canon CLI on the five native
-# cells and an SBOM, and keep them as workflow artifacts.
+# cells, the Python wheel for the same five platforms, the npm package and an
+# SBOM, and keep them as workflow artifacts.
 #
 # This workflow holds no signing, release or registry authority. It is defined
 # by the tagged commit, so a green run is a consistency signal, not release
@@ -187,6 +188,206 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           path: canon-${{ needs.verify.outputs.version }}-${{ matrix.artifact_suffix }}.${{ matrix.archive }}
+
+  build-wheels:
+    # The Python binding's abi3 wheel per platform (scripts/build-wheel.sh):
+    # Linux in the pinned manylinux2014 image (glibc 2.17) with the pinned
+    # rustup-init, macOS and Windows on the runner. Each wheel is installed
+    # alone and passes the binding tests and the corpus before upload.
+    name: Build wheel (${{ matrix.artifact_suffix }})
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            artifact_suffix: darwin-arm64
+            python: python3
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            artifact_suffix: windows-amd64
+            python: python
+          - runner: windows-latest-arm64-s
+            target: aarch64-pc-windows-msvc
+            artifact_suffix: windows-arm64
+            python: python
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Build and test the wheel
+        env:
+          TARGET: ${{ matrix.target }}
+          PYTHON: ${{ matrix.python }}
+        run: scripts/build-wheel.sh "$TARGET" dist/wheel
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-${{ matrix.artifact_suffix }}
+          if-no-files-found: error
+          retention-days: 30
+          path: dist/wheel/*.whl
+
+  build-wheel-linux-amd64:
+    name: Build wheel (linux-amd64)
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
+        run: |
+          mkdir -p "$PWD/dist/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$PWD/dist/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6 \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh x86_64-unknown-linux-gnu /out'
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-linux-amd64
+          if-no-files-found: error
+          retention-days: 30
+          path: dist/wheel/*.whl
+
+  build-wheel-linux-arm64:
+    name: Build wheel (linux-arm64)
+    needs: verify
+    runs-on: ubuntu-latest-arm64-s
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
+        run: |
+          mkdir -p "$PWD/dist/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$PWD/dist/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh aarch64-unknown-linux-gnu /out'
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-linux-arm64
+          if-no-files-found: error
+          retention-days: 30
+          path: dist/wheel/*.whl
+
+  build-npm:
+    # The TypeScript package (scripts/ts-check.sh): the WebAssembly module, the
+    # lockfile-pinned TypeScript, npm pack, then the packed tarball installed
+    # alone passes its tests and the corpus and agrees with Rust. The tarball
+    # it tested is the artifact.
+    name: Build npm package
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.verify.outputs.commit }}
+
+      - name: Confirm annotated tag identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
+          EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          ./scripts/release-restore-tag-ref.sh
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Build, pack and test the package
+        run: |
+          set -euo pipefail
+          node --version
+          mkdir -p dist/npm
+          TS_CHECK_KEEP="$PWD/dist/npm" scripts/ts-check.sh
+
+      - name: Upload npm artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm
+          if-no-files-found: error
+          retention-days: 30
+          path: dist/npm/*.tgz
 
   source:
     name: Source archive

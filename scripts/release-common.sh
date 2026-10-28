@@ -49,6 +49,19 @@ release_base_assets() {
         [[ "$platform" == windows-* ]] && ext=zip
         printf 'canon-%s-%s.%s\n' "$version" "$platform" "$ext"
     done
+    release_binding_assets "$version"
+}
+
+# The Python wheels (abi3, CPython 3.10 and later) and the npm package the
+# tag workflow builds and tests. Names are exact: maturin's platform tags and
+# npm pack's scoped tarball name.
+release_binding_assets() {
+    local version="$1" tag
+    for tag in manylinux_2_17_x86_64.manylinux2014_x86_64 manylinux_2_17_aarch64.manylinux2014_aarch64 \
+        macosx_11_0_arm64 win_amd64 win_arm64; do
+        printf 'canonprims-%s-cp310-abi3-%s.whl\n' "$version" "$tag"
+    done
+    printf '3leaps-canonprims-%s.tgz\n' "$version"
 }
 
 # The source archive of a commit: git archive of the whole tree under a
