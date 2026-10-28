@@ -75,8 +75,9 @@ if command -v cygpath >/dev/null 2>&1; then
   rustup_home="$(cygpath -m "${rustup_home}")" home="$(cygpath -m "${home}")"
 fi
 # The MSVC linker records the PDB's full path in the DLL; record its name only.
+# RUSTFLAGS already holds native paths: Git Bash must not convert it.
 case "$(rustc -vV | awk '/^host:/{print $2}')" in *-windows-msvc) rustflags+=" -Clink-arg=/PDBALTPATH:%_PDB%" ;; esac
-MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" MSYS2_ENV_CONV_EXCL="*" RUSTFLAGS="${rustflags}" \
+MSYS2_ENV_CONV_EXCL=RUSTFLAGS RUSTFLAGS="${rustflags}" \
   "${build_python}" -I -m maturin build --release --locked --quiet "${compat[@]}" \
   --manifest-path bindings/python/Cargo.toml --interpreter "${build_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
