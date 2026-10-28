@@ -1,7 +1,7 @@
 ---
 id: "SecDR-0001"
 title: "The WebAssembly crate allows unsafe code only on its exported functions"
-status: "proposed"
+status: "accepted"
 date: "2026-10-28"
 relates-to:
   - "../../bindings/typescript/Cargo.toml"
