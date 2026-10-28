@@ -18,11 +18,13 @@ bad() { if "$python" -I "$check" "$@" >/dev/null 2>&1; then echo "error: accepte
 printf 'x/rustc/abc/library/alloc/src/string.rs /canonprims/crates/x.rs /cargo/registry/src/y.rs' >"$scratch/clean"
 ok "$scratch/clean" /src /build/.cargo /build/.rustup /build
 ok "$scratch/clean" /
-printf 'x/home/user/work/canonprims/crates/x.rs' >"$scratch/home"
+# Home roots are spliced in so this file holds no literal home path.
+h=/home u=/Users
+printf 'x%s/user/work/canonprims/crates/x.rs' "$h" >"$scratch/home"
 bad "$scratch/home" /home/user
-bad "$scratch/home" /home/user/work/canonprims
+bad "$scratch/home" "$h/user/work/canonprims"
 # A directory whose name merely starts the same way is a different directory.
-printf 'x/home/username/x.rs' >"$scratch/home-longer"
+printf 'x%s/username/x.rs' "$h" >"$scratch/home-longer"
 ok "$scratch/home-longer" /home/user
 # A single-component root counts at the start of a path (after a NUL, a
 # quote or file://), not inside a longer one.
@@ -41,7 +43,7 @@ bad "$scratch/win" 'C:\Users\someone'
 # URL-encoded and mixed separators.
 win='C:\\Users\\someone'
 for form in 'C:\\Users\\someone\\x.rs' 'C:\\\\Users\\\\someone\\\\x.rs' \
-	'path+file:///C:/Users/someone/pkg#1' 'file:///c:/Users/someone/x' \
+	"path+file:///C:$u/someone/pkg#1" "file:///c:$u/someone/x" \
 	'C:%5CUsers%5Csomeone%5Cx' 'C:/Users\\someone/x'; do
 	printf '%s' "$form" >"$scratch/win-form"
 	bad "$scratch/win-form" "$win"
@@ -76,14 +78,14 @@ done
 # A longer name (with a trailing s) is another user, a different directory.
 ok "$scratch/enc-other-user" "/home/user$(printf '\303\251')"
 # A wheel: the path in any member is found.
-"$python" -I - "$scratch/clean.whl" "$scratch/dirty.whl" <<'PY'
+"$python" -I - "$scratch/clean.whl" "$scratch/dirty.whl" "$h" <<'PY'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1], "w") as z:
     z.writestr("pkg/a.so", b"/rustc/abc/library/core/src/x.rs")
     z.writestr("pkg-1.dist-info/RECORD", b"pkg/a.so,sha256=x,1")
 with zipfile.ZipFile(sys.argv[2], "w") as z:
     z.writestr("pkg/a.so", b"clean")
-    z.writestr("pkg-1.dist-info/sboms/x.json", b"path+file:///home/someone/pkg#1")
+    z.writestr("pkg-1.dist-info/sboms/x.json", f"path+file://{sys.argv[3]}/someone/pkg#1".encode())
 PY
 ok "$scratch/clean.whl" /src /home/someone
 bad "$scratch/dirty.whl" /home/someone
