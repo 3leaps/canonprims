@@ -1,6 +1,6 @@
 # SHA-256 of CI tool archives, checked against each project's published
 # checksums before pinning. Fetched only by scripts/ci-install-tools.sh and,
-# for rustup-init, scripts/build-wheel.sh.
+# for rustup-init, scripts/build-wheel.sh, and for jq, scripts/ci-install-jq.sh.
 #
 # goneat v0.6.1        https://github.com/fulmenhq/goneat/releases/tag/v0.6.1
 # cargo-deny 0.20.2    https://github.com/EmbarkStudios/cargo-deny/releases/tag/0.20.2
@@ -18,3 +18,7 @@ fe67d82a10d8597a3549364cb733a3f9cc1bfff9031b7ae46384a9f2a72090c3  cargo-deny-0.2
 #                      Installs the pinned Rust toolchain inside the manylinux wheel-build containers.
 dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71  rustup-init-1.29.1-x86_64-unknown-linux-gnu
 15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433  rustup-init-1.29.1-aarch64-unknown-linux-gnu
+# jq 1.8.2             https://github.com/jqlang/jq/releases/tag/jq-1.8.2 (sha256sum.txt)
+#                      The manylinux wheel-build images ship no jq; the tag restore needs it.
+b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f  jq-1.8.2-linux-amd64
+8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309  jq-1.8.2-linux-arm64

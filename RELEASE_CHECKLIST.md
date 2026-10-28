@@ -204,11 +204,16 @@ project-scoped token can only be made once the project exists).
   and nothing else. The project lands in the `3leaps` organization.
 - [ ] npm: `npm publish 3leaps-canonprims-X.Y.Z.tgz --access public`. The
   tarball, not a directory: npm must not repack it.
-- [ ] Each registry serves the signed bytes: the SHA-256 of every file on
-  `https://pypi.org/pypi/canonprims/X.Y.Z/json` (`urls[].digests.sha256`)
-  equals its `SHA256SUMS` line, and `npm view @3leaps/canonprims@X.Y.Z
-  dist.integrity` equals `sha512-` plus the base64 of the tarball's SHA-512
-  (its `SHA512SUMS` line).
+- [ ] Each registry serves the signed bytes. Compare only against files
+  already checked with the verified `SHA256SUMS` above, never against an
+  unverified manifest:
+  - PyPI: the SHA-256 of every file on
+    `https://pypi.org/pypi/canonprims/X.Y.Z/json` (`urls[].digests.sha256`)
+    equals its line in the verified `SHA256SUMS`.
+  - npm: `npm view @3leaps/canonprims@X.Y.Z dist.integrity` equals
+    `sha512-` plus the base64 SHA-512 computed from the verified local tarball:
+    `printf 'sha512-%s\n' "$(openssl dgst -sha512 -binary
+    3leaps-canonprims-X.Y.Z.tgz | base64 | tr -d '\n')"`.
 - [ ] Revoke a first-publication token.
 
 ## 6. After the release

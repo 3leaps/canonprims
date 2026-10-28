@@ -278,6 +278,8 @@ jobs:
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # The image ships no jq; the restore needs it. Pinned and verified.
+          PATH="$(scripts/ci-install-jq.sh x86_64 "$RUNNER_TEMP/jq"):$PATH"
           ./scripts/release-restore-tag-ref.sh
           test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
@@ -317,6 +319,8 @@ jobs:
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # The image ships no jq; the restore needs it. Pinned and verified.
+          PATH="$(scripts/ci-install-jq.sh aarch64 "$RUNNER_TEMP/jq"):$PATH"
           ./scripts/release-restore-tag-ref.sh
           test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 

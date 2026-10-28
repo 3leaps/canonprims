@@ -311,6 +311,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Tag restore in the release image
+        # The release job restores the tag inside this image before it builds.
+        # CI has no release tag, so the restore suite exercises that script
+        # here, with the same pinned jq and the image's own git and curl.
+        run: |
+          PATH="$(scripts/ci-install-jq.sh x86_64 "$RUNNER_TEMP/jq"):$PATH"
+          bash scripts/release-restore-tag-ref.test.sh
+
       - name: Build and test the release wheel
         run: scripts/build-wheel.sh x86_64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
 
@@ -329,6 +337,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Tag restore in the release image
+        # The release job restores the tag inside this image before it builds.
+        # CI has no release tag, so the restore suite exercises that script
+        # here, with the same pinned jq and the image's own git and curl.
+        run: |
+          PATH="$(scripts/ci-install-jq.sh aarch64 "$RUNNER_TEMP/jq"):$PATH"
+          bash scripts/release-restore-tag-ref.test.sh
 
       - name: Build and test the release wheel
         run: scripts/build-wheel.sh aarch64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
