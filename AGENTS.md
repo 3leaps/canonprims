@@ -77,7 +77,8 @@ generated input.
 - Add GPL/LGPL/AGPL dependencies
 - Write unsafe code. Every crate forbids it, except the WebAssembly crate
   (`bindings/typescript`), which denies it and allows it only on each
-  `#[no_mangle]` export (`make ts-check` refuses any other allowance)
+  `#[no_mangle]` export (`make ts-check` refuses any other allowance;
+  `docs/security/SecDR-0001-wasm-export-unsafe-allowance.md`)
 
 ## Critical rules
 
