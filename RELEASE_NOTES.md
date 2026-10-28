@@ -6,6 +6,21 @@ The latest three releases, newest first. The complete history is in
 
 ---
 
+## v0.1.2 - 2026-10-28
+
+Python and TypeScript bindings, gated by the same conformance corpus and in
+byte-for-byte agreement with Rust.
+
+- Python package `canonprims`: abi3 wheels for CPython 3.10 and later on
+  linux amd64/arm64, darwin arm64 and windows amd64/arm64.
+- npm package `@3leaps/canonprims`: one WebAssembly module, no runtime
+  dependencies.
+- Both are signed release assets; the registry packages are those files.
+
+Details: [docs/releases/v0.1.2.md](docs/releases/v0.1.2.md).
+
+---
+
 ## v0.1.1 - 2026-10-27
 
 The first published release: the RFC 8785 JSON Canonicalization Scheme in Rust and in

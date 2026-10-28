@@ -2,9 +2,12 @@
 
 RFC 8785 JSON canonicalization over a strict I-JSON loader: a binding over the
 Rust `canonprims-json` crate, compiled to one WebAssembly module with no
-imports, for Node.js (20+), Deno, Bun and browsers. It passes the same
-`canonical-json/v0` conformance corpus as the Rust, Go and Python
-implementations. No runtime dependencies.
+imports. It passes the same `canonical-json/v0` conformance corpus as the
+Rust, Go and Python implementations. No runtime dependencies.
+
+Tested on Node.js 20 and 22. The package uses only `WebAssembly`,
+`TextEncoder`, `TextDecoder` and `atob`, so it is expected to work on Deno,
+Bun and in browsers, but those are not yet tested.
 
 ```ts
 import { canonicalize, check, digest, limits, schemeInfo } from "@3leaps/canonprims";

@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.88.0"
 license = "MIT OR Apache-2.0"
@@ -17,8 +17,8 @@ authors = ["3leaps Architecture Council"]
 publish = false
 
 [workspace.dependencies]
-canonprims-core = { version = "0.1.1", path = "crates/canonprims-core" }
-canonprims-json = { version = "0.1.1", path = "crates/canonprims-json" }
+canonprims-core = { version = "0.1.2", path = "crates/canonprims-core" }
+canonprims-json = { version = "0.1.2", path = "crates/canonprims-json" }
 thiserror = "2.0"
 sha2 = "0.10"
 ryu-js = "1.0"
