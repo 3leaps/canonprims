@@ -34,9 +34,23 @@ venv_python="${work}/venv/bin/python"
 [ -x "${venv_python}" ] || venv_python="${work}/venv/Scripts/python.exe"
 "${venv_python}" -I -m pip install --quiet --disable-pip-version-check --require-hashes \
   --only-binary :all: -r config/python-build-requirements.txt
-"${venv_python}" -I -m maturin build --release --locked --quiet \
+# Map the checkout, the Cargo home and the rustup home to fixed names so the
+# extension carries no build-host path.
+RUSTFLAGS="--remap-path-prefix=$(pwd -P)=/canonprims --remap-path-prefix=${CARGO_HOME:-${HOME}/.cargo}=/cargo --remap-path-prefix=${RUSTUP_HOME:-${HOME}/.rustup}=/rustup" \
+  "${venv_python}" -I -m maturin build --release --locked --quiet \
   --manifest-path bindings/python/Cargo.toml --interpreter "${venv_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
+# The extension must carry no build-host path (panic locations are remapped).
+"${venv_python}" -I - "${wheels[0]}" "$(pwd -P)" "${CARGO_HOME:-${HOME}/.cargo}" "${RUSTUP_HOME:-${HOME}/.rustup}" "${HOME}" <<'PY'
+import sys, zipfile
+wheel, *paths = sys.argv[1:]
+with zipfile.ZipFile(wheel) as z:
+    for name in z.namelist():
+        data = z.read(name)
+        for p in paths:
+            if p.encode() in data:
+                raise SystemExit(f"python-check: {name} embeds a build-host path")
+PY
 [ "${#wheels[@]}" -eq 1 ] && [ -f "${wheels[0]}" ] || { echo "python-check: expected one wheel" >&2; exit 1; }
 case "${wheels[0]##*/}" in *-cp310-abi3-*) ;; *) echo "python-check: wheel is not abi3 for 3.10: ${wheels[0]##*/}" >&2; exit 1 ;; esac
 "${venv_python}" -I -m pip install --quiet --disable-pip-version-check --no-index --no-deps "${wheels[0]}"
