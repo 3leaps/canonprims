@@ -36,13 +36,31 @@ venv_python="${work}/venv/bin/python"
   --only-binary :all: -r config/python-build-requirements.txt
 # Map the checkout, the Cargo home and the rustup home to fixed names so the
 # extension carries no build-host path.
-RUSTFLAGS="--remap-path-prefix=$(pwd -P)=/canonprims --remap-path-prefix=${CARGO_HOME:-${HOME}/.cargo}=/cargo --remap-path-prefix=${RUSTUP_HOME:-${HOME}/.rustup}=/rustup" \
+# Git Bash on Windows spells a drive path as /d/a while rustc sees D:\a or
+# D:/a, so on Windows each directory is remapped in both native spellings.
+here="$(pwd -P)" cargo_home="${CARGO_HOME:-${HOME}/.cargo}" rustup_home="${RUSTUP_HOME:-${HOME}/.rustup}" home="${HOME}"
+rustflags=""
+for pair in "${here}=/canonprims" "${cargo_home}=/cargo" "${rustup_home}=/rustup"; do
+  dir="${pair%=*}" to="${pair##*=}"
+  if command -v cygpath >/dev/null 2>&1; then
+    rustflags+=" --remap-path-prefix=$(cygpath -w "${dir}")=${to} --remap-path-prefix=$(cygpath -m "${dir}")=${to}"
+  else
+    rustflags+=" --remap-path-prefix=${dir}=${to}"
+  fi
+done
+if command -v cygpath >/dev/null 2>&1; then
+  here="$(cygpath -m "${here}")" cargo_home="$(cygpath -m "${cargo_home}")"
+  rustup_home="$(cygpath -m "${rustup_home}")" home="$(cygpath -m "${home}")"
+fi
+# The MSVC linker records the PDB's full path in the DLL; record its name only.
+case "$(rustc -vV | awk '/^host:/{print $2}')" in *-windows-msvc) rustflags+=" -Clink-arg=/PDBALTPATH:%_PDB%" ;; esac
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" MSYS2_ENV_CONV_EXCL="*" RUSTFLAGS="${rustflags}" \
   "${venv_python}" -I -m maturin build --release --locked --quiet \
   --manifest-path bindings/python/Cargo.toml --interpreter "${venv_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
 # The extension must carry no build-host path (panic locations are remapped).
 "${venv_python}" -I scripts/host-path-check.py "${wheels[0]}" \
-  "$(pwd -P)" "${CARGO_HOME:-${HOME}/.cargo}" "${RUSTUP_HOME:-${HOME}/.rustup}" "${HOME}" ||
+  "${here}" "${cargo_home}" "${rustup_home}" "${home}" ||
   { echo "python-check: the wheel embeds a build-host path" >&2; exit 1; }
 [ "${#wheels[@]}" -eq 1 ] && [ -f "${wheels[0]}" ] || { echo "python-check: expected one wheel" >&2; exit 1; }
 case "${wheels[0]##*/}" in *-cp310-abi3-*) ;; *) echo "python-check: wheel is not abi3 for 3.10: ${wheels[0]##*/}" >&2; exit 1 ;; esac

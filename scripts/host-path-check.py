@@ -118,8 +118,10 @@ def main(argv):
     for name, data in members(argv[1]):
         for view in views(data):
             for pattern in patterns:
-                if pattern.search(view):
-                    sys.exit(f"{name} embeds a build-host path")
+                m = pattern.search(view)
+                if m:
+                    found = view[m.start():m.end() + 40].decode("ascii", "backslashreplace")
+                    sys.exit(f"{name} embeds a build-host path: {found}")
     return 0
 
 

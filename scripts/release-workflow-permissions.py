@@ -52,6 +52,11 @@ PROFILES = {
     "crates-verify.yml": {"images": [], "boundary": "scripts/ci-crate-verify.sh"},
 }
 SECRET = re.compile(r"(?i)\bsecrets\b|CARGO_REGISTRY_TOKEN|NODE_AUTH_TOKEN")
+# A step may start a container only with docker run, naming a registry image
+# the profile lists; every docker word must be one such run.
+DOCKER = re.compile(r"(?<![\w./-])docker(?![\w-])")
+DOCKER_RUN = re.compile(r"(?<![\w./-])docker\s+run\b")
+IMAGE = re.compile(r"(?<![\w./-])(?:[a-z0-9-]+\.)+[a-z]{2,}/[a-z0-9._/-]+(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?")
 
 
 def fail(reason):
@@ -135,6 +140,12 @@ def check(text, profile):
                     fail("unreviewed release action")
             if FORBIDDEN_COMMANDS.search(shell_code(step.get("run", ""))):
                 fail("workflow release creation or publication")
+            code = shell_code(step.get("run", ""))
+            if DOCKER.search(code):
+                runs, refs = DOCKER_RUN.findall(code), IMAGE.findall(code)
+                if len(DOCKER.findall(code)) != len(runs) or len(refs) != len(runs):
+                    fail(f"{name}: a container step must be one docker run of a reviewed image")
+                images.extend(refs)
     # A crate verification job uploads exactly the directory the verifier
     # creates outside the checkout, so the artifact holds nothing else.
     for name, job in jobs.items():
@@ -250,6 +261,11 @@ def mutations(text):
         sub(MANYLINUX_AMD64, "quay.io/pypa/manylinux2014_x86_64:latest"),
         sub("manylinux2014_aarch64@sha256:d41ea3", "manylinux2014_aarch64@sha256:000000"),
         sub(MANYLINUX_ARM64, "quay.io/pypa/manylinux2014_aarch64:latest"),
+        # Containers only through docker run of a listed image.
+        sub(MANYLINUX_AMD64, MANYLINUX_AMD64 + " && docker pull docker.io/evil/builder:latest"),
+        sub(MANYLINUX_AMD64, "evil-builder"),
+        sub(run, run + "          docker exec x sh\n"),
+        sub(run, run + "          docker run --rm docker.io/evil/builder:latest\n"),
         text.replace(MANYLINUX_AMD64, "@@AMD64@@").replace(MANYLINUX_ARM64, MANYLINUX_AMD64).replace("@@AMD64@@", MANYLINUX_ARM64),
         # Decoded escapes, flow-style container, other gh writes.
         sub(first_runs_on, first_runs_on + '    env:\n      "CARGO_REGISTRY_TO\\u004bEN": "${{ secrets[\'X\'] }}"\n'),

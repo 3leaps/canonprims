@@ -58,7 +58,25 @@ build_python="${work}/build/bin/python"
   --only-binary :all: -r config/python-build-requirements.txt
 # Map the checkout and the tool homes to fixed names: no build-host path in
 # the extension.
-RUSTFLAGS="--remap-path-prefix=$(pwd -P)=/canonprims --remap-path-prefix=${CARGO_HOME:-${HOME}/.cargo}=/cargo --remap-path-prefix=${RUSTUP_HOME:-${HOME}/.rustup}=/rustup" \
+# Git Bash on Windows spells a drive path as /d/a while rustc sees D:\a or
+# D:/a, so on Windows each directory is remapped in both native spellings.
+here="$(pwd -P)" cargo_home="${CARGO_HOME:-${HOME}/.cargo}" rustup_home="${RUSTUP_HOME:-${HOME}/.rustup}" home="${HOME}"
+rustflags=""
+for pair in "${here}=/canonprims" "${cargo_home}=/cargo" "${rustup_home}=/rustup"; do
+  dir="${pair%=*}" to="${pair##*=}"
+  if command -v cygpath >/dev/null 2>&1; then
+    rustflags+=" --remap-path-prefix=$(cygpath -w "${dir}")=${to} --remap-path-prefix=$(cygpath -m "${dir}")=${to}"
+  else
+    rustflags+=" --remap-path-prefix=${dir}=${to}"
+  fi
+done
+if command -v cygpath >/dev/null 2>&1; then
+  here="$(cygpath -m "${here}")" cargo_home="$(cygpath -m "${cargo_home}")"
+  rustup_home="$(cygpath -m "${rustup_home}")" home="$(cygpath -m "${home}")"
+fi
+# The MSVC linker records the PDB's full path in the DLL; record its name only.
+case "$(rustc -vV | awk '/^host:/{print $2}')" in *-windows-msvc) rustflags+=" -Clink-arg=/PDBALTPATH:%_PDB%" ;; esac
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" MSYS2_ENV_CONV_EXCL="*" RUSTFLAGS="${rustflags}" \
   "${build_python}" -I -m maturin build --release --locked --quiet "${compat[@]}" \
   --manifest-path bindings/python/Cargo.toml --interpreter "${build_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
@@ -85,7 +103,7 @@ tests="${root}/bindings/python/tests"
   { cat "${work}/unittest.log" >&2; exit 1; }
 ! grep -q 'skipped' "${work}/unittest.log" || { echo "build-wheel: tests must not skip" >&2; exit 1; }
 "${test_python}" -I scripts/host-path-check.py "${work}/wheels/${wheel}" \
-  "$(pwd -P)" "${CARGO_HOME:-${HOME}/.cargo}" "${RUSTUP_HOME:-${HOME}/.rustup}" "${HOME}" ||
+  "${here}" "${cargo_home}" "${rustup_home}" "${home}" ||
   { echo "build-wheel: the wheel embeds a build-host path" >&2; exit 1; }
 mkdir -p "${out}"
 cp "${work}/wheels/${wheel}" "${out}/"

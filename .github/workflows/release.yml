@@ -258,8 +258,6 @@ jobs:
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    container:
-      image: quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6
     defaults:
       run:
         shell: bash
@@ -277,14 +275,18 @@ jobs:
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          # The image ships no jq; the restore needs it. Pinned and verified.
-          PATH="$(scripts/ci-install-jq.sh x86_64 "$RUNNER_TEMP/jq"):$PATH"
           ./scripts/release-restore-tag-ref.sh
           test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
-      - name: Build and test the wheel
-        run: scripts/build-wheel.sh x86_64-unknown-linux-gnu dist/wheel
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
+        run: |
+          mkdir -p "$PWD/dist/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$PWD/dist/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6 \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh x86_64-unknown-linux-gnu /out'
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -299,8 +301,6 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest-arm64-s
     timeout-minutes: 30
-    container:
-      image: quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e
     defaults:
       run:
         shell: bash
@@ -318,14 +318,18 @@ jobs:
           CANONPRIMS_EXPECTED_TAG_OBJECT: ${{ needs.verify.outputs.object }}
           EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          # The image ships no jq; the restore needs it. Pinned and verified.
-          PATH="$(scripts/ci-install-jq.sh aarch64 "$RUNNER_TEMP/jq"):$PATH"
           ./scripts/release-restore-tag-ref.sh
           test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 
-      - name: Build and test the wheel
-        run: scripts/build-wheel.sh aarch64-unknown-linux-gnu dist/wheel
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
+        run: |
+          mkdir -p "$PWD/dist/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$PWD/dist/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh aarch64-unknown-linux-gnu /out'
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -300,8 +300,6 @@ jobs:
     name: release wheel (linux-amd64)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    container:
-      image: quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6
     defaults:
       run:
         shell: bash
@@ -311,24 +309,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Tag restore in the release image
-        # The release job restores the tag inside this image before it builds.
-        # CI has no release tag, so the restore suite exercises that script
-        # here, with the same pinned jq and the image's own git and curl.
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
         run: |
-          PATH="$(scripts/ci-install-jq.sh x86_64 "$RUNNER_TEMP/jq"):$PATH"
-          bash scripts/release-restore-tag-ref.test.sh
-
-      - name: Build and test the release wheel
-        run: scripts/build-wheel.sh x86_64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
+          mkdir -p "$RUNNER_TEMP/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$RUNNER_TEMP/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6 \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh x86_64-unknown-linux-gnu /out'
 
   release-wheel-linux-arm64:
     name: release wheel (linux-arm64)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest-arm64-s
     timeout-minutes: 30
-    container:
-      image: quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e
     defaults:
       run:
         shell: bash
@@ -338,16 +333,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Tag restore in the release image
-        # The release job restores the tag inside this image before it builds.
-        # CI has no release tag, so the restore suite exercises that script
-        # here, with the same pinned jq and the image's own git and curl.
+      - name: Build and test the wheel in the manylinux2014 image
+        # The image's glibc 2.17 cannot run the Node.js that actions need, so
+        # only the build runs in it; checkout and upload stay on the runner.
         run: |
-          PATH="$(scripts/ci-install-jq.sh aarch64 "$RUNNER_TEMP/jq"):$PATH"
-          bash scripts/release-restore-tag-ref.test.sh
-
-      - name: Build and test the release wheel
-        run: scripts/build-wheel.sh aarch64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
+          mkdir -p "$RUNNER_TEMP/wheel"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home \
+            -v "$PWD:/src" -v "$RUNNER_TEMP/wheel:/out" -w /src \
+            quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e \
+            bash -c 'mkdir -p "$HOME" && git config --global --add safe.directory /src && scripts/build-wheel.sh aarch64-unknown-linux-gnu /out'
 
   release-npm:
     # Rehearses the tag workflow's npm package build: scripts/ts-check.sh on
