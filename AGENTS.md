@@ -30,6 +30,7 @@ generated input.
 | Go tests | `make test-go` |
 | Agreement | `make crosscheck` |
 | Python binding | `make python-check` |
+| TypeScript binding | `make ts-check` |
 | Corpus | `make corpus` / `make corpus-check` |
 
 ## Session protocol
@@ -74,6 +75,10 @@ generated input.
 - Repair input silently
 - Commit secrets or local guidance files
 - Add GPL/LGPL/AGPL dependencies
+- Write unsafe code. Every crate forbids it, except the WebAssembly crate
+  (`bindings/typescript`), which denies it and allows it only on each
+  `#[no_mangle]` export (`make ts-check` refuses any other allowance;
+  `docs/security/SecDR-0001-wasm-export-unsafe-allowance.md`)
 
 ## Critical rules
 
@@ -103,5 +108,7 @@ MIT OR Apache-2.0. All dependencies must stay permissively licensed.
 | `scripts/crosscheck.sh` | Rust/Go byte-for-byte agreement |
 | `bindings/python` | Python binding (PyO3); its own Cargo workspace, never a release crate |
 | `scripts/python-check.sh` | Python wheel, tests, corpus and Rust agreement |
+| `bindings/typescript` | TypeScript binding (wasm32); its own Cargo workspace, never a release crate |
+| `scripts/ts-check.sh` | TypeScript package, tests, corpus and Rust agreement |
 | `VERSION` | Version SSOT |
 | `.fulmen/repo.yaml` | Repository class declaration (prims, Profile B, leaf) |

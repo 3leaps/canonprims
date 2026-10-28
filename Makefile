@@ -9,13 +9,14 @@
 #   make prepush     check
 #   make crosscheck  Rust and Go agreement only
 #   make python-check  Python binding: wheel, tests, corpus and Rust agreement
+#   make ts-check      TypeScript binding: wasm, package, tests, corpus and Rust agreement
 
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 .PHONY: all help check precommit prepush fmt fmt-check lint test test-rust test-go msrv-check
 .PHONY: pr-final surface-scan content-check jq-portability doctor
-.PHONY: corpus corpus-check witness witness-controls crosscheck python-check deny deps-check workflow-pin version version-check build clean
+.PHONY: corpus corpus-check witness witness-controls crosscheck python-check ts-check deny deps-check workflow-pin version version-check build clean
 .PHONY: release-tooling-test release-check release-preflight release-prepare-tag-message release-tag release-push-tag
 .PHONY: release-verify-tag release-verify-remote-tag release-record-anchor release-export-pin release-validate-pin
 .PHONY: release-insert-anchors release-crates-list release-source-check release-clean
@@ -30,6 +31,7 @@ GOENV := GOWORK=off CGO_ENABLED=0
 MSRV := $(shell sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
 VERSION := $(shell tr -d ' \t\r\n' < VERSION)
 PY_BINDING := bindings/python
+TS_BINDING := bindings/typescript
 
 all: check
 
@@ -65,17 +67,20 @@ content-check: ## Refuse local paths, private keys, tokens and commit markers in
 fmt: ## Format Rust and Go
 	$(CARGO) fmt --all
 	$(CARGO) fmt --manifest-path $(PY_BINDING)/Cargo.toml
+	$(CARGO) fmt --manifest-path $(TS_BINDING)/Cargo.toml
 	gofmt -w canon
 
 fmt-check: ## Check formatting
 	$(CARGO) fmt --all -- --check
 	$(CARGO) fmt --manifest-path $(PY_BINDING)/Cargo.toml -- --check
+	$(CARGO) fmt --manifest-path $(TS_BINDING)/Cargo.toml -- --check
 	@out="$$(gofmt -l canon)"; if [ -n "$$out" ]; then echo "gofmt: $$out"; exit 1; fi
 	@echo "[ok] fmt-check"
 
 lint: ## clippy and go vet
 	$(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
 	CARGO_TARGET_DIR=$(CURDIR)/target/python $(CARGO) clippy --manifest-path $(PY_BINDING)/Cargo.toml --all-targets --locked -- -D warnings
+	CARGO_TARGET_DIR=$(CURDIR)/target/wasm $(CARGO) clippy --manifest-path $(TS_BINDING)/Cargo.toml --target wasm32-unknown-unknown --locked -- -D warnings
 	$(GOENV) $(GO) vet ./...
 	@echo "[ok] lint"
 
@@ -109,9 +114,13 @@ crosscheck: ## Rust and Go agree byte for byte
 python-check: ## Python binding: build the wheel, run its tests and corpus, agree with Rust
 	CARGO_TARGET_DIR=$(CURDIR)/target/python PYTHON=$(PYTHON) scripts/python-check.sh
 
+ts-check: ## TypeScript binding: build the wasm package, run its tests and corpus, agree with Rust
+	PYTHON=$(PYTHON) scripts/ts-check.sh
+
 deny: ## cargo-deny: licenses, bans, sources, advisories
 	$(CARGO) deny --locked check
 	$(CARGO) deny --manifest-path $(PY_BINDING)/Cargo.toml --locked check
+	$(CARGO) deny --manifest-path $(TS_BINDING)/Cargo.toml --locked check
 
 workflow-pin: ## Every workflow matches its reviewed digest and is read-only
 	$(PYTHON) -B -E scripts/release-workflow-pin.py check
@@ -129,10 +138,12 @@ doctor: ## Report host tool versions against the recommended minimums (DOCTOR_SC
 version: ## Print the version
 	@echo $(VERSION)
 
-version-check: ## VERSION matches Cargo.toml and the Python binding
+version-check: ## VERSION matches Cargo.toml and both bindings
 	@test "$(VERSION)" = "$$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)" || { echo "VERSION and Cargo.toml differ"; exit 1; }
 	@test "$(VERSION)" = "$$(sed -n 's/^version = "\(.*\)"/\1/p' $(PY_BINDING)/Cargo.toml | head -1)" || { echo "VERSION and $(PY_BINDING)/Cargo.toml differ"; exit 1; }
 	@test "$(VERSION)" = "$$(sed -n 's/^version = "\(.*\)"/\1/p' $(PY_BINDING)/pyproject.toml | head -1)" || { echo "VERSION and $(PY_BINDING)/pyproject.toml differ"; exit 1; }
+	@test "$(VERSION)" = "$$(sed -n 's/^version = "\(.*\)"/\1/p' $(TS_BINDING)/Cargo.toml | head -1)" || { echo "VERSION and $(TS_BINDING)/Cargo.toml differ"; exit 1; }
+	@test "$(VERSION)" = "$$($(PYTHON) -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' $(TS_BINDING)/package.json)" || { echo "VERSION and $(TS_BINDING)/package.json differ"; exit 1; }
 	@echo "[ok] version-check"
 
 build: ## Release build of the canon CLI

@@ -13,3 +13,4 @@ Record types and naming follow
 | [PDR-0001](PDR-0001-crates-io-publication.md) | crates.io publication: packages verified in CI, token released only for the verified package | accepted |
 | [PDR-0002](PDR-0002-dependency-and-build-policy.md) | Dependencies come from crates.io only, cool before adoption, and build at a pinned toolchain | accepted |
 | [PDR-0003](PDR-0003-public-source-review.md) | Public source, history and change text carry no private context | accepted |
+| [SecDR-0001](../security/SecDR-0001-wasm-export-unsafe-allowance.md) | The WebAssembly crate allows unsafe code only on its exported functions | accepted |

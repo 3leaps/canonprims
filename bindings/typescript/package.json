@@ -1,0 +1,28 @@
+{
+  "name": "@3leaps/canonprims",
+  "version": "0.1.1",
+  "description": "Canonical serialization for structured data: RFC 8785 JSON over a strict I-JSON loader (WebAssembly)",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3leaps/canonprims.git",
+    "directory": "bindings/typescript"
+  },
+  "keywords": ["canonicalization", "rfc8785", "jcs", "json", "wasm"],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": ["dist/index.js", "dist/index.d.ts", "dist/wasm.js", "dist/wasm.d.ts", "LICENSE-MIT", "LICENSE-APACHE", "README.md"],
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
