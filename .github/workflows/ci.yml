@@ -223,6 +223,145 @@ jobs:
       - name: TypeScript binding
         run: make ts-check
 
+  release-wheels:
+    # Rehearses the tag workflow's wheel builds on every change: the same
+    # script (scripts/build-wheel.sh), runners and Python. The tag workflow
+    # only runs on a tag, so this is where its build path is proven first.
+    name: release wheel (${{ matrix.artifact_suffix }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            artifact_suffix: darwin-arm64
+            python: python3
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            artifact_suffix: windows-amd64
+            python: python
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Build and test the release wheel
+        env:
+          TARGET: ${{ matrix.target }}
+          PYTHON: ${{ matrix.python }}
+        run: scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+
+  release-wheels-arm64:
+    # As release-wheels, on the organization arm64 runners (same-repo only).
+    name: release wheel (${{ matrix.artifact_suffix }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest-arm64-s
+            target: aarch64-pc-windows-msvc
+            artifact_suffix: windows-arm64
+            python: python
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Build and test the release wheel
+        env:
+          TARGET: ${{ matrix.target }}
+          PYTHON: ${{ matrix.python }}
+        run: scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+
+  release-wheel-linux-amd64:
+    name: release wheel (linux-amd64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64@sha256:d6b5342c73e51b8eacd114cb41733798b749494d0a749cef0bd76c99fb47d5c6
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and test the release wheel
+        run: scripts/build-wheel.sh x86_64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
+
+  release-wheel-linux-arm64:
+    name: release wheel (linux-arm64)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest-arm64-s
+    timeout-minutes: 30
+    container:
+      image: quay.io/pypa/manylinux2014_aarch64@sha256:d41ea3e9c9ad7a47e393673d0e8acba58fa411ceff58bc6b88bca38795ec938e
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and test the release wheel
+        run: scripts/build-wheel.sh aarch64-unknown-linux-gnu "$RUNNER_TEMP/wheel"
+
+  release-npm:
+    # Rehearses the tag workflow's npm package build: scripts/ts-check.sh on
+    # the same runner, with the runner's Node.js.
+    name: release npm package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # reviewed 2026-08-04 commit
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Build, pack and test the package
+        run: |
+          set -euo pipefail
+          node --version
+          mkdir -p "$RUNNER_TEMP/npm"
+          TS_CHECK_KEEP="$RUNNER_TEMP/npm" scripts/ts-check.sh
+          ls "$RUNNER_TEMP/npm"
+
   workflow-lint:
     name: workflow-lint
     runs-on: ubuntu-latest
