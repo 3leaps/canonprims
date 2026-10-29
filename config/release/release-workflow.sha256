@@ -1,4 +1,4 @@
 92405e74de73dc1f827880f1863e0a592fbd86a9f44660cd3f0999256d2c469c  .github/actions/make-check/action.yml
-a03401a308e08d0c17ffab5c11c312df2f52540ed48934c4690f4bb4d51bf07c  .github/workflows/ci.yml
+a2de7f5f070750440005e72f267f62855886431673ccc94e20a4a940440a08cd  .github/workflows/ci.yml
 8e74a4ec2cab94655e66b48865c8b85030f4fb45faab511b77ec75d7cf7278a1  .github/workflows/crates-verify.yml
 7e9a7cf748e61535f66b61b8d9dc163687cf8871ebc6f9eb12d7f77323571708  .github/workflows/release.yml
