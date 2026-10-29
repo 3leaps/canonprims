@@ -21,7 +21,7 @@ toolchain="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)"
 python="${PYTHON:-python3}"
 work="$(mktemp -d "${TMPDIR:-/tmp}/canonprims-wheel.XXXXXX")"
 # BUILD_WHEEL_KEEP=1 keeps the scratch directory for diagnosis.
-[ "${BUILD_WHEEL_KEEP:-}" = 1 ] || trap 'rm -rf "${work}"' EXIT
+[ "${BUILD_WHEEL_KEEP:-}" = 1 ] || trap 'rc=$?; rm -rf "${work}"; exit "${rc}"' EXIT
 
 case "${target}" in
   x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu)
@@ -78,7 +78,7 @@ fi
 # RUSTFLAGS already holds native paths: Git Bash must not convert it.
 case "$(rustc -vV | awk '/^host:/{print $2}')" in *-windows-msvc) rustflags+=" -Clink-arg=/PDBALTPATH:%_PDB%" ;; esac
 MSYS2_ENV_CONV_EXCL=RUSTFLAGS RUSTFLAGS="${rustflags}" \
-  "${build_python}" -I -m maturin build --release --locked --quiet "${compat[@]}" \
+  "${build_python}" -I -m maturin build --release --locked --quiet ${compat[@]+"${compat[@]}"} \
   --manifest-path bindings/python/Cargo.toml --interpreter "${build_python}" --out "${work}/wheels"
 wheels=("${work}"/wheels/canonprims-*.whl)
 [ "${#wheels[@]}" -eq 1 ] && [ -f "${wheels[0]}" ] || { echo "build-wheel: expected one wheel" >&2; exit 1; }
@@ -108,4 +108,5 @@ tests="${root}/bindings/python/tests"
   { echo "build-wheel: the wheel embeds a build-host path" >&2; exit 1; }
 mkdir -p "${out}"
 cp "${work}/wheels/${wheel}" "${out}/"
+[ -s "${out}/${wheel}" ] || { echo "build-wheel: missing output ${out}/${wheel}" >&2; exit 1; }
 echo "[ok] ${wheel} (${platform})"

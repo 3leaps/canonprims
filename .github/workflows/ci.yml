@@ -260,7 +260,9 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           PYTHON: ${{ matrix.python }}
-        run: scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+        run: |
+          scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+          ls "$RUNNER_TEMP/wheel/"*.whl
 
   release-wheels-arm64:
     # As release-wheels, on the organization arm64 runners (same-repo only).
@@ -294,7 +296,9 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           PYTHON: ${{ matrix.python }}
-        run: scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+        run: |
+          scripts/build-wheel.sh "$TARGET" "$RUNNER_TEMP/wheel"
+          ls "$RUNNER_TEMP/wheel/"*.whl
 
   release-wheel-linux-amd64:
     name: release wheel (linux-amd64)

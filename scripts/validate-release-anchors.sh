@@ -42,8 +42,11 @@ if not re.fullmatch('[0-9A-F]{40}', g.get('fingerprint', '')) or not re.fullmatc
 if lines != ['gpg ' + g['fingerprint'], 'minisign ' + m['fingerprint']]:
     raise SystemExit('error: anchor text and records differ')
 PY
+verify_out="$(mktemp)"
+trap 'rm -f "$verify_out"' EXIT
 "$RELEASE_DECERNOR_BIN" fingerprint verify --anchors "$txt" --anchors-ndjson "$ndjson" \
-	--gpg "$asc" --minisign "$pub" >/dev/null || {
+	--gpg "$asc" --minisign "$pub" >"$verify_out" || {
+	cat "$verify_out" >&2
 	echo 'error: decernor does not verify the public exports against the anchors' >&2
 	exit 1
 }

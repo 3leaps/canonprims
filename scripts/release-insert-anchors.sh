@@ -67,5 +67,8 @@ done
 	"$RELEASE_DECERNOR_BIN" fingerprint verify \
 	--anchors "$root/keys/expected-fingerprints.txt" \
 	--anchors-ndjson "$root/keys/expected-fingerprints.ndjson" \
-	--gpg "$scratch/release-signing-keys.asc" --minisign "$scratch/canonprims-minisign.pub" >/dev/null
+	--gpg "$scratch/release-signing-keys.asc" --minisign "$scratch/canonprims-minisign.pub" >"$scratch/verify.ndjson" || {
+	cat "$scratch/verify.ndjson" >&2
+	exit 1
+}
 echo "[ok] derived public fingerprint anchors from $commit; review and commit keys/"
