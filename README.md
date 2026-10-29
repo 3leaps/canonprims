@@ -33,16 +33,15 @@ checker (see Development).
 | --- | --- | --- |
 | Rust | `canonprims-core`, `canonprims-json` (crates.io) | shipped with v0.1.1 |
 | Go | `github.com/3leaps/canonprims` (package `canon`) | shipped with v0.1.1 |
-| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation (WebAssembly) | in development (`bindings/typescript`); not yet published |
-| Python | `canonprims` (PyPI), from the Rust implementation | in development (`bindings/python`); not yet published |
+| TypeScript | `@3leaps/canonprims` (npm), from the Rust implementation (WebAssembly) | shipped with v0.1.2 |
+| Python | `canonprims` (PyPI), from the Rust implementation | shipped with v0.1.2 |
 
-The Python and TypeScript bindings build from source (see
-`bindings/python/README.md` and `bindings/typescript/README.md`) and pass the
-same corpus; neither is published to PyPI or npm yet.
+The Python and TypeScript bindings pass the same corpus as Rust and Go; see
+`bindings/python/README.md` and `bindings/typescript/README.md`.
 
 ## Status
 
-0.1.1 is the first release. While the version is 0.x the API may still change between minor releases.
+0.1.1 was the first release; 0.1.2 adds the Python and TypeScript bindings. While the version is 0.x the API may still change between minor releases.
 
 ## Use
 
@@ -57,7 +56,7 @@ $ canon jcs --check fixture.json    # exit 0 only if already canonical
 $ canon info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
 $ canon version --extended
-{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.1"}
+{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.2"}
 ```
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:

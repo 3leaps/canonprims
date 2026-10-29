@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "canonprims-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "sha2",
  "thiserror",
@@ -21,7 +21,7 @@ dependencies = [
 
 [[package]]
 name = "canonprims-json"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "canonprims-core",
  "ryu-js",
@@ -29,7 +29,7 @@ dependencies = [
 
 [[package]]
 name = "canonprims-wasm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "canonprims-json",
 ]
