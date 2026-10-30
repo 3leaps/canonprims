@@ -145,8 +145,8 @@ files=()
 while IFS= read -r name; do files+=("$name"); done < <(release_signable_assets | LC_ALL=C sort)
 (
     cd "$scratch/assets"
-    shasum -a 256 "${files[@]}" >SHA256SUMS
-    shasum -a 512 "${files[@]}" >SHA512SUMS
+    shasum -a 256 ${files[@]+"${files[@]}"} >SHA256SUMS
+    shasum -a 512 ${files[@]+"${files[@]}"} >SHA512SUMS
 )
 ./scripts/release-create-draft.sh v1.2.3 "$scratch/assets" >/dev/null
 # The draft names the anchored commit as its target, so GitHub stores that SHA

@@ -17,5 +17,5 @@ for tag in "${tags[@]}"; do
 	[[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]] || tag_die "remote tag $tag already exists"
 	refs+=("refs/tags/$tag")
 done
-git push --atomic origin "${refs[@]}"
+git push --atomic origin ${refs[@]+"${refs[@]}"}
 "$tag_root/scripts/release-verify-remote-tag.sh"

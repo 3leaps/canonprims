@@ -17,13 +17,13 @@ cd "$root"
 # change to that list.
 suites=()
 while IFS= read -r -d '' file; do suites+=("$file"); done < <(find "$root/scripts" -maxdepth 1 -name '*.test.sh' -print0 | LC_ALL=C sort -z)
-found="$(for file in "${suites[@]}"; do basename "$file" .test.sh; done | LC_ALL=C sort)"
+found="$(for file in ${suites[@]+"${suites[@]}"}; do basename "$file" .test.sh; done | LC_ALL=C sort)"
 [[ "$found" == "$(cat "$root/config/release/tooling-suites.txt")" ]] || {
 	echo 'error: release tooling suites differ from config/release/tooling-suites.txt' >&2
 	diff <(cat "$root/config/release/tooling-suites.txt") <(printf '%s\n' "$found") >&2 || true
 	exit 1
 }
-for suite in "${suites[@]}"; do
+for suite in ${suites[@]+"${suites[@]}"}; do
 	echo "== $(basename "$suite" .test.sh)"
 	"$suite"
 done

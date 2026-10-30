@@ -47,7 +47,7 @@ if [[ "$(release_gh repo view "$CANONPRIMS_REPOSITORY" --json nameWithOwner --jq
 fi
 
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/canonprims-published.XXXXXX")"
-trap 'rm -rf "$scratch"' EXIT
+trap 'rc=$?; rm -rf "$scratch"; exit "$rc"' EXIT
 
 state="$scratch/state.json"
 expected="$scratch/expected.txt"

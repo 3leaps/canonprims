@@ -16,7 +16,7 @@ while IFS= read -r name; do files+=("$name"); done < <(release_signable_assets |
     for manifest in SHA256SUMS SHA512SUMS; do
         [[ ! -e "$manifest" && ! -L "$manifest" ]] || { echo "error: $manifest already exists" >&2; exit 1; }
     done
-    shasum -a 256 "${files[@]}" >SHA256SUMS
-    shasum -a 512 "${files[@]}" >SHA512SUMS
+    shasum -a 256 ${files[@]+"${files[@]}"} >SHA256SUMS
+    shasum -a 512 ${files[@]+"${files[@]}"} >SHA512SUMS
 )
 "$root/scripts/verify-checksums.sh" "$directory"

@@ -7,7 +7,7 @@ source "$root/scripts/release-common.sh"
 directory="${1:-dist/release}"
 files=()
 while IFS= read -r name; do files+=("$name"); done < <(release_signable_assets)
-python3 - "$directory" "${files[@]}" <<'PY'
+python3 - "$directory" ${files[@]+"${files[@]}"} <<'PY'
 import hashlib
 import pathlib
 import re
