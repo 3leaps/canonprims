@@ -3,7 +3,7 @@
 # the release-source checks see only crates/.
 [package]
 name = "canonprims-py"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 rust-version = "1.88.0"
 license = "MIT OR Apache-2.0"

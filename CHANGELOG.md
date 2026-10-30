@@ -7,6 +7,45 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-30
+
+- OIDC Trusted Publishing workflow (`.github/workflows/registry-publish.yml`)
+  for PyPI (`canonprims`) and npm (`@3leaps/canonprims`), gated by
+  tag-restricted `publish-pypi` and `publish-npm` environments, with
+  `scripts/ci-prepare-pypi-publish.sh` and `scripts/ci-publish-npm-oidc.sh`
+  re-verifying staged SHA-256 digests against the signed `SHA256SUMS` manifest
+  before upload
+- Published-release staging and live registry digest and provenance verification
+  (`scripts/release-stage-published.sh`, `scripts/release-verify-registries.sh`,
+  `scripts/release-verify-registries.py`, `make release-stage-published`,
+  `make release-verify-registries`), binding staged signing keys, fingerprint
+  pins and release notes to the verified tag commit and checking PyPI
+  organization ownership (`3leaps`), PyPI PEP 740 provenance attestations, npm
+  SHA-512 SRI integrity, and npm Sigstore provenance attestations
+- Read-only GitHub repository and OIDC environment preflight
+  (`scripts/release-github-preflight.sh`, `make release-github-preflight`),
+  verifying the `publish-pypi` and `publish-npm` environments (required
+  reviewer + `v*` tag policy), the `Tag Publish Protection` ruleset, and
+  `immutable_releases`
+- OpenPGP signer command-line pinning (`-c gpg.format=openpgp -c gpg.program=gpg
+  -c gpg.openpgp.program=gpg`), default `~/.gnupg` keyring refusal in
+  `scripts/release-tag-common.sh` and `scripts/release-post-tag-selector.sh`,
+  and the 3-line tag message attribution trailer in
+  `scripts/release-prepare-tag-message.py`
+- Bare-name npm redirector helper (`scripts/pack-npm-redirector.sh`,
+  `make release-pack-npm-redirector`) and two-phase unsigned draft staging
+  (`make release-stage`, `make release-crates-clean`)
+- Rust `canon-diff` crosscheck driver enforces lowercase-only ASCII hex
+  (`0-9a-f`) on `--max-bytes`, `--max-depth`, `--max-members` and
+  `--max-string-bytes`, matching Go `difftool`, Python and TypeScript drivers
+- macOS `/bin/bash` (Bash 3.2) empty-array expansion and `EXIT` trap exit-code
+  preservation in `scripts/build-wheel.sh` and release scripts, enforced by a
+  static `bash -n` and empty-array guard in `scripts/jq-portability.sh`
+- Windows-portable mode-`120000` symlink index blobs and `core.autocrlf=false`
+  in `scripts/surface-scan.test.sh` and `scripts/content-check.test.sh`, and
+  `npm` (`>= 10.0.0`) and `uv` (`>= 0.5.0`) tool minimum declarations in
+  `.goneat/tools.yaml` and `config/doctor-versions.txt`
+
 ## [0.1.2] - 2026-10-28
 
 - Python binding `canonprims` (`bindings/python`, PyO3): one abi3 wheel per
@@ -57,6 +96,7 @@ listed here ships in 0.1.1.
 - Public-surface checks: a vocabulary-free content check of tracked files in
   `make check`, and a maintainer-only limensafe scan in `make pr-final`
 
-[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/3leaps/canonprims/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/3leaps/canonprims/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/3leaps/canonprims/releases/tag/v0.1.1
