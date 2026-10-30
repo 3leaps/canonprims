@@ -11,10 +11,10 @@ maintainer's machine. CI holds no signing, release or registry authority.
 
 ## Prerequisites
 
-- `gpg`, `minisign`, `gh`, `jq`, `python3` (3.11 or newer) and the workspace
-  MSRV toolchain installed. `make doctor` reports each tool's version against
-  the recommended minimum in `.goneat/tools.yaml` and fails on any tool that
-  is missing, older, or whose version it cannot read.
+- `gpg`, `minisign`, `gh`, `jq`, `python3` (3.11 or newer), `npm`, `uv` and the
+  workspace MSRV toolchain installed. `make doctor` reports each tool's version
+  against the recommended minimum in `.goneat/tools.yaml` and fails on any tool
+  that is missing, older, or whose version it cannot read.
 - decernor 0.1.8 or newer as a regular file at an absolute path
 - limensafe and the maintainer's catalog, which the pre-tag gate requires for
   the public-surface scan (it never runs in CI)
@@ -135,6 +135,10 @@ commit as inert git objects and never run its scripts.
 - [ ] `make release`: clean, download the exact successful workflow run,
   stage notes and public material from the tagged commit, checksum, create the
   draft, sign both manifests, verify and upload. The release stays a draft.
+  (In a two-step ceremony where unsigned staging runs before signing, run
+  `make release-stage` first, inspect `dist/release/SHA256SUMS`, and then run
+  `make release-sign`, `make release-upload` and `make release-publish` without
+  re-running `release-clean`.)
   - Expected assets: `canon-X.Y.Z-{linux-amd64,linux-arm64,darwin-arm64}.tar.gz`,
     `canon-X.Y.Z-{windows-amd64,windows-arm64}.zip`,
     `canonprims-X.Y.Z-cp310-abi3-{manylinux_2_17_x86_64.manylinux2014_x86_64,manylinux_2_17_aarch64.manylinux2014_aarch64,macosx_11_0_arm64,win_amd64,win_arm64}.whl`,
@@ -164,6 +168,8 @@ registry with its predecessors already published.
   (`CANONPRIMS_CARGO_TOKEN_FILE`), scoped to publishing updates of these
   crates. A first publication uses a short-lived token for new crates,
   revoked afterwards. `CARGO_REGISTRY_TOKEN` must not be set.
+- [ ] `make release-crates-clean` so no `dist/crates/*.identity.json` from an
+  earlier release remains.
 
 For each crate in order (`CRATE=canonprims-core`, then
 `CRATE=canonprims-json`):
@@ -193,27 +199,37 @@ maintainer uploads with a scoped token kept outside the repository (a first
 upload needs an account- or organization-wide token, revoked afterwards: a
 project-scoped token can only be made once the project exists).
 
-- [ ] Download the published release into an empty directory outside the
-  repository and verify it there: `minisign -Vm SHA256SUMS -p
-  canonprims-minisign.pub` (the committed pin, compared with
-  `docs/security/canonprims-minisign.pub` at the tag), `gpg --verify
-  SHA256SUMS.asc SHA256SUMS` by the committed signing subkey, then
-  `sha256sum --check --ignore-missing SHA256SUMS` lists every wheel and the
-  npm tarball as OK.
-- [ ] PyPI: `twine upload` the five `canonprims-X.Y.Z-cp310-abi3-*.whl` files
-  and nothing else. The project lands in the `3leaps` organization.
-- [ ] npm: `npm publish 3leaps-canonprims-X.Y.Z.tgz --access public`. The
-  tarball, not a directory: npm must not repack it.
-- [ ] Each registry serves the signed bytes. Compare only against files
-  already checked with the verified `SHA256SUMS` above, never against an
-  unverified manifest:
-  - PyPI: the SHA-256 of every file on
-    `https://pypi.org/pypi/canonprims/X.Y.Z/json` (`urls[].digests.sha256`)
-    equals its line in the verified `SHA256SUMS`.
-  - npm: `npm view @3leaps/canonprims@X.Y.Z dist.integrity` equals
-    `sha512-` plus the base64 SHA-512 computed from the verified local tarball:
-    `printf 'sha512-%s\n' "$(openssl dgst -sha512 -binary
-    3leaps-canonprims-X.Y.Z.tgz | base64 | tr -d '\n')"`.
+- [ ] `make release-stage-published`: downloads the published GitHub release
+  into `dist/published` and verifies that the release is non-draft at the
+  tagged commit, its public keys and anchors match the tagged commit,
+  `SHA256SUMS` and `SHA512SUMS` verify under both minisign and the committed
+  OpenPGP signing subkey, all 20 asset checksums match, and the five wheels and
+  npm tarball carry version `X.Y.Z`.
+- [ ] PyPI: `uvx twine upload dist/published/canonprims-X.Y.Z-cp310-abi3-*.whl`
+  (the five wheel files and nothing else). On a first upload with a user-scoped
+  token, transfer the project to the `3leaps` organization in PyPI project
+  settings (`https://pypi.org/manage/project/canonprims/settings/`) so
+  `.ownership.organization` is `"3leaps"`. (`twine --sign` is not used because
+  PyPI removed `.asc` signature uploads; wheel authenticity is anchored by the
+  minisign and OpenPGP signed `SHA256SUMS` on the immutable GitHub release,
+  plus PEP 740 attestations when published via OIDC Trusted Publishing.)
+- [ ] npm: `npm publish dist/published/3leaps-canonprims-X.Y.Z.tgz --access public`
+  (authenticate via browser web-authn when prompted so no long-lived npm token
+  is needed). Pass the tarball, not a directory: npm must not repack it.
+  - One-time defensive bare-name redirector (`canonprims` ->
+    `@3leaps/canonprims`): `make release-pack-npm-redirector`, publish
+    `dist/npm-redirector/canonprims-X.Y.Z.tgz`, transfer `canonprims` to the
+    `3leaps` npm org, and deprecate it immediately:
+    `npm deprecate canonprims "Canonical package is @3leaps/canonprims — install @3leaps/canonprims instead."`
+- [ ] `make release-verify-registries`: re-verifies the signatures and
+  checksums in `dist/published`, polls PyPI and npm (with bounded retry for
+  index/scan propagation), and checks that:
+  - PyPI (`https://pypi.org/pypi/canonprims/X.Y.Z/json`) reports
+    `ownership.organization == "3leaps"` and the SHA-256 of every wheel equals
+    its line in the verified `SHA256SUMS`.
+  - npm (`@3leaps/canonprims@X.Y.Z`) serves the exact `dist.integrity`
+    (`sha512-...`) and `dist.shasum` of the verified
+    `3leaps-canonprims-X.Y.Z.tgz`.
 - [ ] Revoke a first-publication token.
 
 ## 6. After the release
@@ -222,4 +238,5 @@ project-scoped token can only be made once the project exists).
 - [ ] `pip install canonprims==X.Y.Z` and `npm install @3leaps/canonprims@X.Y.Z`
   in fresh environments import and canonicalize `{"b":1,"a":2}`.
 - [ ] Someone other than the publisher verifies the published release: the
-  tag, the anchors, the manifests and every digest.
+  tag, the anchors, the manifests and every digest (`CANONPRIMS_RELEASE_TAG=vX.Y.Z
+  make release-stage-published release-verify-registries`).

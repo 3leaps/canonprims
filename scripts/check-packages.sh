@@ -16,6 +16,10 @@ mapfile_crates() {
 }
 crates=()
 mapfile_crates
+[[ "${#crates[@]}" -gt 0 ]] || {
+    echo 'error: no publishable crates declared' >&2
+    exit 1
+}
 temp_root="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 package_target=$(mktemp -d "$temp_root/canonprims-package.XXXXXX")
 trap 'rm -rf "$package_target"' EXIT
@@ -61,10 +65,10 @@ sorted_expected=()
 while IFS= read -r archive; do
     sorted_expected+=("$archive")
 done < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
-if [[ "${actual[*]}" != "${sorted_expected[*]}" ]]; then
+if [[ "${actual[*]+"${actual[*]}"}" != "${sorted_expected[*]+"${sorted_expected[*]}"}" ]]; then
     printf '[ERROR] package artifacts differ from the expected publishable crates\n' >&2
-    printf 'expected: %s\n' "${sorted_expected[*]}" >&2
-    printf 'actual:   %s\n' "${actual[*]}" >&2
+    printf 'expected: %s\n' "${sorted_expected[*]+"${sorted_expected[*]}"}" >&2
+    printf 'actual:   %s\n' "${actual[*]+"${actual[*]}"}" >&2
     exit 1
 fi
 

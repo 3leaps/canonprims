@@ -87,6 +87,7 @@ GNUPGHOME="$keyring/home" gpg --batch --quiet --import "$keyring/keys.asc" || di
 
 count=0
 tag_load_set --tagged
+[[ "${#tag_names[@]}" -eq 1 ]] || die 'a release is exactly one signed tag'
 for tag in "${tag_names[@]}"; do
 	object="$(git rev-parse --verify --quiet "$ref_prefix$tag")" || die "$tag is absent"
 	[[ "$(git cat-file -t "$object")" == tag ]] || die "$tag must be an annotated tag"

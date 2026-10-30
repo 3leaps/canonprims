@@ -24,12 +24,14 @@ func TestRunWritesResults(t *testing.T) {
 }
 
 func TestRunRefusesBadHex(t *testing.T) {
-	var out, errOut bytes.Buffer
-	if code := run(strings.NewReader("7b7d\n7B7D\n"), &out, &errOut); code != 2 {
-		t.Fatalf("exit %d, want 2", code)
-	}
-	if out.String() != "ok 7b7d\n" || !strings.Contains(errOut.String(), "line 2: not valid hex") {
-		t.Fatalf("stdout %q, stderr %q", out.String(), errOut.String())
+	for _, bad := range []string{"7b7d\n7B7D\n", "7b7d\n+17b\n", "7b7d\n7b7\n", "7b7d\n7b7d\r\n"} {
+		var out, errOut bytes.Buffer
+		if code := run(strings.NewReader(bad), &out, &errOut); code != 2 {
+			t.Fatalf("%q: exit %d, want 2", bad, code)
+		}
+		if out.String() != "ok 7b7d\n" || !strings.Contains(errOut.String(), "line 2: not valid hex") {
+			t.Fatalf("%q: stdout %q, stderr %q", bad, out.String(), errOut.String())
+		}
 	}
 }
 

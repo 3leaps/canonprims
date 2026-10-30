@@ -10,10 +10,13 @@ use std::process::ExitCode;
 use canonprims_json::canonprims_core::Limits;
 
 fn unhex(line: &str) -> Option<Vec<u8>> {
-    if !line.len().is_multiple_of(2) {
+    let bytes = line.as_bytes();
+    if !bytes.len().is_multiple_of(2)
+        || !bytes.iter().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    {
         return None;
     }
-    (0..line.len())
+    (0..bytes.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(line.get(i..i + 2)?, 16).ok())
         .collect()

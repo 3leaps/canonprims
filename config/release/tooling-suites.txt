@@ -20,6 +20,7 @@ release-source-check
 release-tag-controls
 release-validate-pin
 release-verify-published-tag
+release-verify-registries
 release-workflow-permissions
 release-write-guards
 surface-scan
