@@ -18,7 +18,7 @@ patterns="$root/config/doctor-versions.txt"
 
 # Version output in each tool's own format, at or above its declared minimum.
 # (Plain functions, not associative arrays: macOS ships bash 3.2.)
-tools_stubbed='git gh jq gpg minisign go'
+tools_stubbed='git gh jq gpg minisign npm uv go'
 good() {
 	case "$1" in
 	git) echo 'git version 2.54.0 (Apple Git-157)' ;;
@@ -26,6 +26,8 @@ good() {
 	jq) echo 'jq-1.7.1' ;;
 	gpg) echo 'gpg (GnuPG) 2.2.0' ;;
 	minisign) echo 'minisign 0.11' ;;
+	npm) echo '11.19.0' ;;
+	uv) echo 'uv 0.8.22 (ade2bdbd2 2025-09-23)' ;;
 	go) echo 'go version go1.21.0 linux/arm64' ;;
 	esac
 }
@@ -37,6 +39,8 @@ old() {
 	jq) echo 'jq-1.6' ;;
 	gpg) echo 'gpg (GnuPG) 2.1.23' ;;
 	minisign) echo 'minisign 0.10' ;;
+	npm) echo '9.9.4' ;;
+	uv) echo 'uv 0.4.30' ;;
 	go) echo 'go version go1.20.14 linux/arm64' ;;
 	esac
 }
@@ -81,7 +85,7 @@ passes release
 passes dev
 # Each tool's version format is parsed to the right number.
 doctor release
-for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11'; do
+for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11' 'npm 11.19.0' 'uv 0.8.22'; do
 	grep -q "^\[ok\] $line (minimum" "$scratch/out" || { echo "error: did not read '$line'" >&2; cat "$scratch/out" >&2; exit 1; }
 done
 doctor dev

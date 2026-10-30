@@ -28,8 +28,8 @@ files=()
 while IFS= read -r name; do files+=("$name"); done < <(release_signable_assets | LC_ALL=C sort)
 (
     cd "$scratch/local"
-    shasum -a 256 "${files[@]}" >SHA256SUMS
-    shasum -a 512 "${files[@]}" >SHA512SUMS
+    shasum -a 256 ${files[@]+"${files[@]}"} >SHA256SUMS
+    shasum -a 512 ${files[@]+"${files[@]}"} >SHA512SUMS
 )
 printf synthetic >"$scratch/local/SHA256SUMS.minisig"
 printf synthetic >"$scratch/local/SHA512SUMS.minisig"

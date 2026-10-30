@@ -26,4 +26,4 @@ while IFS= read -r name; do files+=("$directory/$name"); done < <(release_checks
 require_published_anchor "$directory"
 commit="$(awk -F= '$1=="commit" {print $2}' "$directory.anchor")"
 release_gh release create "$tag" --repo "$CANONPRIMS_REPOSITORY" --verify-tag --draft --target "$commit" \
-    --title "$tag" --notes-file "$directory/release-notes-$tag.md" "${files[@]}"
+    --title "$tag" --notes-file "$directory/release-notes-$tag.md" ${files[@]+"${files[@]}"}

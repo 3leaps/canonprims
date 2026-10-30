@@ -32,6 +32,8 @@ import yaml  # noqa: E402
 PIN = "config/release/release-workflow.sha256"
 WORKFLOWS = ".github/workflows/"
 ACTIONS = ".github/actions/"
+OIDC_WORKFLOW = ".github/workflows/registry-publish.yml"
+OIDC_JOBS = {"publish-pypi": "publish-pypi", "publish-npm": "publish-npm"}
 
 
 def fail(reason):
@@ -39,13 +41,26 @@ def fail(reason):
 
 
 def read_only(path, text):
-    """Top-level contents: read, and no job grants anything wider."""
+    """Top-level contents: read, and no job grants anything wider (except the
+    two environment-gated OIDC publish jobs in registry-publish.yml)."""
     data = yaml.safe_load(text)
     if not isinstance(data, dict) or data.get("permissions") != {"contents": "read"}:
         fail(f"{path} must declare top-level permissions: contents: read")
+    if path == OIDC_WORKFLOW:
+        trigger = data.get("on") if "on" in data else data.get(True)
+        if not isinstance(trigger, dict) or set(trigger) != {"workflow_dispatch"}:
+            fail(f"{path} must trigger on workflow_dispatch only")
     for name, job in (data.get("jobs") or {}).items():
         permissions = job.get("permissions") if isinstance(job, dict) else None
         if permissions is None:
+            continue
+        if (
+            path == OIDC_WORKFLOW
+            and name in OIDC_JOBS
+            and isinstance(job, dict)
+            and job.get("environment") == OIDC_JOBS[name]
+            and permissions == {"contents": "read", "id-token": "write"}
+        ):
             continue
         if not isinstance(permissions, dict) or any(
             str(value).strip().lower() not in ("read", "none") for value in permissions.values()

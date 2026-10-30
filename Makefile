@@ -19,10 +19,10 @@ SHELL := bash
 .PHONY: corpus corpus-check witness witness-controls crosscheck python-check ts-check deny deps-check workflow-pin version version-check build clean
 .PHONY: release-tooling-test release-check release-preflight release-prepare-tag-message release-tag release-push-tag
 .PHONY: release-verify-tag release-verify-remote-tag release-record-anchor release-export-pin release-validate-pin
-.PHONY: release-insert-anchors release-crates-list release-source-check release-clean
+.PHONY: release-insert-anchors release-crates-list release-source-check release-crates-clean release-clean
 .PHONY: release-crates-fetch release-crate-dry-run release-crate-publish
-.PHONY: release-download release-notes release-checksums release-create-draft release-sign release-verify
-.PHONY: release-upload release-publish release
+.PHONY: release-download release-notes release-checksums release-create-draft release-stage release-sign release-verify
+.PHONY: release-upload release-publish release release-stage-published release-verify-registries release-pack-npm-redirector
 
 CARGO ?= cargo
 GO ?= go
@@ -186,6 +186,7 @@ REQUIRE_RELEASE_TAG = @if [ -z "$(CANONPRIMS_RELEASE_TAG)" ]; then \
 	echo "error: CANONPRIMS_RELEASE_TAG=vX.Y.Z is required"; exit 1; fi
 
 DIST_RELEASE := dist/release
+DIST_PUBLISHED := dist/published
 DIST_CRATES := dist/crates
 # Per-cut notes file for the version in the tree (preflight only; not a tag).
 NOTES_NAME := v$(strip $(VERSION))
@@ -279,8 +280,11 @@ release-crate-publish: ## Publish one crate through the release credential provi
 	@test -n "$(CRATE)" || { echo "error: CRATE=<name> is required"; exit 1; }
 	CANONPRIMS_CRATE_RECORDS="$(abspath $(DIST_CRATES))" scripts/release-crate-publish.sh --publish "$(CRATE)"
 
-release-clean: ## Remove dist/release and its anchor
-	rm -rf "$(DIST_RELEASE)" "$(DIST_RELEASE).anchor"
+release-crates-clean: ## Remove dist/crates
+	rm -rf "$(DIST_CRATES)"
+
+release-clean: release-crates-clean ## Remove dist/release, dist/published, their anchors, and dist/crates
+	rm -rf "$(DIST_RELEASE)" "$(DIST_RELEASE).anchor" "$(DIST_PUBLISHED)" "$(DIST_PUBLISHED).anchor"
 
 release-download: ## Fetch the exact successful tag-workflow artifacts
 	$(REQUIRE_RELEASE_TAG)
@@ -297,6 +301,15 @@ release-checksums: ## Generate SHA256SUMS and SHA512SUMS
 release-create-draft: ## Create the draft release from the checksummed set
 	$(REQUIRE_RELEASE_TAG)
 	scripts/release-create-draft.sh "$(CANONPRIMS_RELEASE_TAG)" "$(DIST_RELEASE)"
+
+release-stage: ## Clean -> download -> stage -> checksums -> draft (unsigned; inspect before signing)
+	$(REQUIRE_RELEASE_TAG)
+	$(MAKE) release-clean
+	$(MAKE) release-download
+	$(MAKE) release-notes
+	$(MAKE) release-checksums
+	$(MAKE) release-create-draft
+	@echo "[ok] unsigned draft staged in $(DIST_RELEASE); inspect SHA256SUMS, then run: make release-sign release-upload release-publish"
 
 release-sign: ## Sign both checksum manifests with minisign and OpenPGP
 	$(REQUIRE_RELEASE_TAG)
@@ -317,11 +330,19 @@ release-publish: ## Promote the verified draft (maintainer)
 
 release: ## Clean -> download -> stage -> checksums -> draft -> sign -> upload
 	$(REQUIRE_RELEASE_TAG)
-	$(MAKE) release-clean
-	$(MAKE) release-download
-	$(MAKE) release-notes
-	$(MAKE) release-checksums
-	$(MAKE) release-create-draft
+	$(MAKE) release-stage
 	$(MAKE) release-sign
 	$(MAKE) release-upload
 	@echo "[ok] signed draft staged; make release-publish promotes it"
+
+release-stage-published: ## Download and verify the published GitHub release into dist/published
+	$(REQUIRE_RELEASE_TAG)
+	rm -rf "$(DIST_PUBLISHED)" "$(DIST_PUBLISHED).anchor"
+	scripts/release-stage-published.sh "$(CANONPRIMS_RELEASE_TAG)" "$(DIST_PUBLISHED)"
+
+release-verify-registries: ## Verify PyPI and npm serve the exact signed release bytes in dist/published
+	$(REQUIRE_RELEASE_TAG)
+	scripts/release-verify-registries.sh "$(DIST_PUBLISHED)" $(or $(REGISTRY),all)
+
+release-pack-npm-redirector: ## Build the bare-name npm redirector tarball (canonprims-<version>.tgz)
+	scripts/pack-npm-redirector.sh dist/npm-redirector "$(VERSION)"

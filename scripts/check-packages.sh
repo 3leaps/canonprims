@@ -16,9 +16,13 @@ mapfile_crates() {
 }
 crates=()
 mapfile_crates
+[[ "${#crates[@]}" -gt 0 ]] || {
+    echo 'error: no publishable crates declared' >&2
+    exit 1
+}
 temp_root="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 package_target=$(mktemp -d "$temp_root/canonprims-package.XXXXXX")
-trap 'rm -rf "$package_target"' EXIT
+trap 'rc=$?; rm -rf "$package_target"; exit "$rc"' EXIT
 
 export CARGO_TARGET_DIR="$package_target"
 
@@ -32,7 +36,7 @@ msrv="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' "$PROJECT_ROOT/Cargo.toml")"
 package_args=()
 patch_args=()
 expected=()
-for crate in "${crates[@]}"; do
+for crate in ${crates[@]+"${crates[@]}"}; do
     package_args+=(-p "$crate")
     if [[ "$crate" != "${crates[${#crates[@]} - 1]}" ]]; then
         patch_args+=(--config "patch.crates-io.${crate}.path=\"crates/${crate}\"")
@@ -46,10 +50,10 @@ verify_args=()
 if [[ "${CI:-}" != true ]]; then
     verify_args=(--no-verify)
     cargo_home=$(mktemp -d "$temp_root/canonprims-cargo-home.XXXXXX")
-    trap 'rm -rf "$package_target" "$cargo_home"' EXIT
+    trap 'rc=$?; rm -rf "$package_target" "$cargo_home"; exit "$rc"' EXIT
     export CARGO_HOME="$cargo_home"
 fi
-cargo "+$msrv" package "${package_args[@]}" ${verify_args[@]+"${verify_args[@]}"} --locked ${patch_args[@]+"${patch_args[@]}"}
+cargo "+$msrv" package ${package_args[@]+"${package_args[@]}"} ${verify_args[@]+"${verify_args[@]}"} --locked ${patch_args[@]+"${patch_args[@]}"}
 
 package_dir="$CARGO_TARGET_DIR/package"
 actual=()
@@ -60,15 +64,15 @@ done < <(find "$package_dir" -maxdepth 1 -type f -name 'canonprims-*.crate' | so
 sorted_expected=()
 while IFS= read -r archive; do
     sorted_expected+=("$archive")
-done < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
-if [[ "${actual[*]}" != "${sorted_expected[*]}" ]]; then
+done < <(printf '%s\n' ${expected[@]+"${expected[@]}"} | LC_ALL=C sort)
+if [[ "${actual[*]+"${actual[*]}"}" != "${sorted_expected[*]+"${sorted_expected[*]}"}" ]]; then
     printf '[ERROR] package artifacts differ from the expected publishable crates\n' >&2
-    printf 'expected: %s\n' "${sorted_expected[*]}" >&2
-    printf 'actual:   %s\n' "${actual[*]}" >&2
+    printf 'expected: %s\n' "${sorted_expected[*]+"${sorted_expected[*]}"}" >&2
+    printf 'actual:   %s\n' "${actual[*]+"${actual[*]}"}" >&2
     exit 1
 fi
 
-for crate in "${crates[@]}"; do
+for crate in ${crates[@]+"${crates[@]}"}; do
     archive="$package_dir/$crate-$version.crate"
     manifest_path="$crate-$version/Cargo.toml"
     python3 -I - "$archive" "$manifest_path" "$version" <<'PY'
@@ -96,4 +100,4 @@ for target in manifest.get("target", {}).values():
 PY
 done
 
-printf '[ok] Verified package archives: %s\n' "${expected[*]}"
+printf '[ok] Verified package archives: %s\n' "${expected[*]+"${expected[*]}"}"

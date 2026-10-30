@@ -57,6 +57,18 @@ go_driver="${work}/canon-diff-go"
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) go_driver="${go_driver}.exe" ;; esac
 GOWORK=off CGO_ENABLED=0 go build -o "${go_driver}" ./canon/internal/difftool
 
+# Both drivers must refuse uppercase hex, leading signs, odd length and CR with exit 2.
+for bad in '7B7D\n' '+17b\n' '7b7\n' '7b7d\r\n'; do
+  for drv in "${rust_driver}" "${go_driver}"; do
+    rc=0
+    printf "${bad}" | "${drv}" >/dev/null 2>&1 || rc=$?
+    if [ "${rc}" -ne 2 ]; then
+      echo "crosscheck: ${drv##*/} exited ${rc} (want 2) on invalid hex ${bad}" >&2
+      exit 1
+    fi
+  done
+done
+
 for seed in ${seeds}; do
   "${python}" -I scripts/crosscheck-gen.py "${seed}" "${count}" > "${work}/in.${seed}"
   "${rust_driver}" < "${work}/in.${seed}" > "${work}/rust.${seed}"
