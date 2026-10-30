@@ -27,6 +27,11 @@ Refuses, anywhere in the commit's tree:
     [patch], [replace] and package.workspace.
 Requires every crate in config/release/publishable-crates.txt (read from the
 commit) at crates/<name>/Cargo.toml naming that package.
+
+Porting note: canonprims is a pure-Rust/WASM primitive and bans build.rs
+tree-wide. Sibling OS/FFI/N-API repositories that require a build script on
+specific FFI or N-API binding crates should allowlist those exact crate paths
+rather than removing the build.rs check.
 """
 
 import pathlib

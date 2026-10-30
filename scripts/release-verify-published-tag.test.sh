@@ -30,7 +30,7 @@ git -C "$src" config user.email infosec@3leaps.net
 mkdir -p "$src/scripts" "$src/docs/security" "$src/keys" "$src/config/release"
 verifier=(verify-pinned-tag.sh validate-release-anchors.sh release-verify-published-tag.sh release-tag-common.sh release-gh.sh release-workflow-pin.py
     release-decernor.sh release-insert-anchors.sh install-release-anchors.sh)
-for script in "${verifier[@]}"; do cp "$root/scripts/$script" "$src/scripts/"; done
+for script in ${verifier[@]+"${verifier[@]}"}; do cp "$root/scripts/$script" "$src/scripts/"; done
 cp "$root/config/release/tagger-identity.txt" "$src/config/release/"
 printf '1.2.3\n' >"$src/VERSION"
 printf 'module github.com/3leaps/canonprims\n' >"$src/go.mod"
@@ -55,7 +55,7 @@ sign_tag() {
     local target="${2:-HEAD}"
     printf '%s\n' "$1" >"$scratch/msg"
     GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
-        git -C "$src" tag -fs -a --cleanup=verbatim -u "$subkey!" -F "$scratch/msg" v1.2.3 "$target" >/dev/null
+        git -C "$src" -c gpg.format=openpgp -c gpg.program=gpg -c gpg.openpgp.program=gpg tag -fs -a --cleanup=verbatim -u "$subkey!" -F "$scratch/msg" v1.2.3 "$target" >/dev/null
 }
 sign_tag 'Fixture release'
 git -C "$src" remote add origin "$scratch/remote.git"
@@ -90,7 +90,7 @@ export CANONPRIMS_DECERNOR_BIN="$decernor"
 export CANONPRIMS_GPG_SIGNING_FINGERPRINT="$primary"
 
 # The operator's trusted checkout carries the current verifier and helpers.
-for script in "${verifier[@]}"; do cp "$root/scripts/$script" "$op/scripts/"; done
+for script in ${verifier[@]+"${verifier[@]}"}; do cp "$root/scripts/$script" "$op/scripts/"; done
 gate() { (cd "$op" && ./scripts/release-verify-published-tag.sh); }
 expect_fail() {
     if gate >"$scratch/out" 2>&1; then
@@ -176,7 +176,7 @@ git -C "$src" add -A
 git -C "$src" commit -qm 'attacker pin'
 printf 'Fixture release\n' >"$scratch/msg"
 GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
-    git -C "$src" tag -fs -a --cleanup=verbatim -u "$attacker_sub!" -F "$scratch/msg" v1.2.3 >/dev/null
+    git -C "$src" -c gpg.format=openpgp -c gpg.program=gpg -c gpg.openpgp.program=gpg tag -fs -a --cleanup=verbatim -u "$attacker_sub!" -F "$scratch/msg" v1.2.3 >/dev/null
 git -C "$src" push -q origin main
 git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'not the approved primary'

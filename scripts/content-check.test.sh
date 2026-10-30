@@ -7,12 +7,13 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+trap 'rc=$?; rm -rf "$scratch"; exit "$rc"' EXIT
 repo="$scratch/repo"
 git init -q "$repo"
+git -C "$repo" config core.autocrlf false
 git -C "$repo" config user.name fixture
 git -C "$repo" config user.email fixture@example.invalid
-check() { python3 -I -B "$root/scripts/content-check.py" "$repo" >"$scratch/out" 2>&1; }
+check() { "${PYTHON:-python3}" -I -B "$root/scripts/content-check.py" "$repo" >"$scratch/out" 2>&1; }
 plant() {
 	printf '%s\n' "$1" >"$repo/f.txt"
 	git -C "$repo" add -A
@@ -63,17 +64,18 @@ if check; then echo 'error: an unstaged scrub hid a committed token' >&2; exit 1
 grep -q 'GitHub token' "$scratch/out"
 git -C "$repo" checkout -q -- f.txt
 plant 'clean'
-# A committed symlink's target is a committed blob.
-ln -s "/$u/$name/projects/x" "$repo/link"
-git -C "$repo" add link
+# A committed symlink's target is a committed blob (staged as a 120000 git entry
+# so Windows hosts without symlink privilege exercise the exact same tree object).
+link_oid="$(printf '%s' "/$u/$name/projects/x" | git -C "$repo" hash-object -w --stdin)"
+git -C "$repo" update-index --add --cacheinfo "120000,$link_oid,link"
 git -C "$repo" commit -qm 'add link'
 if check; then echo 'error: accepted a symlink to a home path' >&2; exit 1; fi
 grep -q 'link:1: home directory' "$scratch/out"
-git -C "$repo" rm -q link
+git -C "$repo" update-index --force-remove link
 git -C "$repo" commit -qm 'drop link'
 # Another ref can be checked.
-check_ref() { python3 -I -B "$root/scripts/content-check.py" "$repo" "$1" >"$scratch/out" 2>&1; }
+check_ref() { "${PYTHON:-python3}" -I -B "$root/scripts/content-check.py" "$repo" "$1" >"$scratch/out" 2>&1; }
 if check_ref HEAD~1; then echo 'error: the earlier ref with a symlink passed' >&2; exit 1; fi
 # The real tree is clean.
-python3 -I -B "$root/scripts/content-check.py" "$root" >/dev/null
+"${PYTHON:-python3}" -I -B "$root/scripts/content-check.py" "$root" >/dev/null
 echo '[ok] content-check: home paths, Windows profiles, private keys, GitHub and AWS tokens, commit markers; synthetic homes and untracked files pass'

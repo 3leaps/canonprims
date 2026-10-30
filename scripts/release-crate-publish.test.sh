@@ -44,7 +44,7 @@ chmod +x "$repo/scripts/release-verify-published-tag.sh"
 maintainer_scripts=(release-crate-publish.sh release-cargo-provider.py release-crate-record.py release-index-entry.py
 	check-registry-config.py release-common.sh release-gh.sh)
 mkdir -p "$fixture_dir/trusted"
-for name in "${maintainer_scripts[@]}"; do
+for name in ${maintainer_scripts[@]+"${maintainer_scripts[@]}"}; do
 	cp -p "$repo/scripts/$name" "$fixture_dir/trusted/$name"
 	printf '#!/usr/bin/env bash\ntouch "%s/poisoned"\nexit 0\n' "$fixture_dir" >"$repo/scripts/$name"
 done

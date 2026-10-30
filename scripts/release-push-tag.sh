@@ -11,9 +11,9 @@ tag_origin
 tag_approved_primary
 "$tag_root/scripts/release-verify-tag.sh"
 tag_load_set
-tags=("${tag_names[@]}")
+tags=(${tag_names[@]+"${tag_names[@]}"})
 refs=()
-for tag in "${tags[@]}"; do
+for tag in ${tags[@]+"${tags[@]}"}; do
 	[[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]] || tag_die "remote tag $tag already exists"
 	refs+=("refs/tags/$tag")
 done

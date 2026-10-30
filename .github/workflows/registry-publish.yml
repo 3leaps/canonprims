@@ -103,6 +103,7 @@ jobs:
           ./scripts/release-validate-pin.sh
           ./scripts/verify-pinned-tag.sh
           python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"
+          ./scripts/release-github-preflight.sh
           ./scripts/release-stage-published.sh "$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"
           version="$(tr -d '\r\n' < VERSION)"
           object="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG")"
@@ -151,7 +152,10 @@ jobs:
         env:
           STAGE_VERSION: ${{ needs.verify.outputs.version }}
           STAGE_COMMIT: ${{ needs.verify.outputs.commit }}
-        run: ./scripts/ci-prepare-pypi-publish.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage dist/pypi-wheels
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/tags/v$STAGE_VERSION" && "${GITHUB_REF_TYPE:-tag}" == "tag" ]]
+          ./scripts/ci-prepare-pypi-publish.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage dist/pypi-wheels
 
       - name: Publish wheels to PyPI with PEP 740 attestations
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
@@ -159,10 +163,10 @@ jobs:
           packages-dir: dist/pypi-wheels
           attestations: true
 
-      - name: Verify PyPI serves the signed wheel bytes
+      - name: Verify PyPI serves the signed wheel bytes and PEP 740 provenance
         env:
           STAGE_VERSION: ${{ needs.verify.outputs.version }}
-        run: python3 -I -B scripts/release-verify-registries.py dist/registry-stage "$STAGE_VERSION" pypi
+        run: python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage "$STAGE_VERSION" pypi
 
   publish-npm:
     name: Publish tarball to npm
@@ -200,4 +204,7 @@ jobs:
         env:
           STAGE_VERSION: ${{ needs.verify.outputs.version }}
           STAGE_COMMIT: ${{ needs.verify.outputs.commit }}
-        run: ./scripts/ci-publish-npm-oidc.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/tags/v$STAGE_VERSION" && "${GITHUB_REF_TYPE:-tag}" == "tag" ]]
+          ./scripts/ci-publish-npm-oidc.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage

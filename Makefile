@@ -17,7 +17,7 @@ SHELL := bash
 .PHONY: all help check precommit prepush fmt fmt-check lint test test-rust test-go msrv-check
 .PHONY: pr-final surface-scan content-check jq-portability doctor
 .PHONY: corpus corpus-check witness witness-controls crosscheck python-check ts-check deny deps-check workflow-pin version version-check build clean
-.PHONY: release-tooling-test release-check release-preflight release-prepare-tag-message release-tag release-push-tag
+.PHONY: release-tooling-test release-check release-github-preflight release-preflight release-prepare-tag-message release-tag release-push-tag
 .PHONY: release-verify-tag release-verify-remote-tag release-record-anchor release-export-pin release-validate-pin
 .PHONY: release-insert-anchors release-crates-list release-source-check release-crates-clean release-clean
 .PHONY: release-crates-fetch release-crate-dry-run release-crate-publish
@@ -197,6 +197,9 @@ release-tooling-test: ## Synthetic release-tooling controls (no operator keys or
 release-check: version-check ## Package the published crates locally (does not publish)
 	scripts/check-packages.sh
 
+release-github-preflight: ## Verify GitHub OIDC environments, Tag Publish Protection ruleset and immutable_releases
+	scripts/release-github-preflight.sh
+
 release-preflight: ## Pre-tag gate on a clean main synced with origin
 	@source scripts/release-decernor.sh && resolve_release_decernor && echo "[ok] checker $$RELEASE_DECERNOR_BIN"
 	@test -z "$$(git status --porcelain)" || { echo "error: working tree not clean"; git status --short; exit 1; }
@@ -208,6 +211,7 @@ release-preflight: ## Pre-tag gate on a clean main synced with origin
 	@test "$$(git symbolic-ref --quiet --short HEAD)" = main || { echo "error: release from main"; exit 1; }
 	git fetch --quiet origin main
 	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "error: HEAD differs from origin/main"; exit 1; }
+	scripts/release-github-preflight.sh
 	@# The source to be tagged must be inert for Cargo before anything builds it.
 	$(PYTHON) -I scripts/release-source-check.py HEAD
 	$(MAKE) check release-tooling-test release-check

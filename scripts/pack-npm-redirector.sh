@@ -5,6 +5,10 @@
 # `@3leaps/canonprims`, and is immediately deprecated with:
 #   npm deprecate canonprims "Canonical package is @3leaps/canonprims — install @3leaps/canonprims instead."
 #
+# Note on 0.x SemVer: `"@3leaps/canonprims": "^0.Y.Z"` resolves to `<0.(Y+1).0`.
+# Immediate deprecation of the bare name is mandatory so consumers never depend
+# on the unscoped package across 0.x minor bumps.
+#
 # Usage: scripts/pack-npm-redirector.sh <out-dir> [version]
 set -euo pipefail
 

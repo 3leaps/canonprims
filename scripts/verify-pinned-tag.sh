@@ -88,14 +88,14 @@ GNUPGHOME="$keyring/home" gpg --batch --quiet --import "$keyring/keys.asc" || di
 count=0
 tag_load_set --tagged
 [[ "${#tag_names[@]}" -eq 1 ]] || die 'a release is exactly one signed tag'
-for tag in "${tag_names[@]}"; do
+for tag in ${tag_names[@]+"${tag_names[@]}"}; do
 	object="$(git rev-parse --verify --quiet "$ref_prefix$tag")" || die "$tag is absent"
 	[[ "$(git cat-file -t "$object")" == tag ]] || die "$tag must be an annotated tag"
 	[[ "$(git cat-file tag "$object" | sed -n 's/^tag //p' | head -1)" == "$tag" ]] || die "$tag object names a different tag"
 	[[ "$(git rev-parse "${object}^{commit}")" == "$target" ]] || die "$tag does not point at the release commit $target"
 	tagger="$(git cat-file tag "$object" | sed -n 's/^tagger \(.*\) [0-9][0-9]* [+-][0-9][0-9][0-9][0-9]$/\1/p' | head -1)"
 	[[ "$tagger" == "$(cat "$keyring/tagger-identity.txt")" ]] || die "$tag tagger differs from the committed identity"
-	GNUPGHOME="$keyring/home" git -c gpg.program=gpg verify-tag --raw "$object" >"$keyring/status" 2>&1 || {
+	GNUPGHOME="$keyring/home" git -c gpg.format=openpgp -c gpg.program=gpg -c gpg.openpgp.program=gpg verify-tag --raw "$object" >"$keyring/status" 2>&1 || {
 		awk '$1=="[GNUPG:]" {print "signature status:", $2}' "$keyring/status" >&2
 		die "$tag signature is invalid under the pin"
 	}

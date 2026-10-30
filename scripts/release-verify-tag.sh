@@ -14,7 +14,7 @@ resolve_release_decernor
 export RELEASE_DECERNOR_BIN
 target="$(git rev-parse HEAD)"
 tag_load_set
-for tag in "${tag_names[@]}"; do
+for tag in ${tag_names[@]+"${tag_names[@]}"}; do
 	tag_verify_object "$tag" "$target"
 done
 "$tag_root/scripts/verify-pinned-tag.sh"
