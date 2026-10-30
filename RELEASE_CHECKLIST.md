@@ -59,7 +59,10 @@ uses them.
 
 Every file under `.github/workflows/` and `.github/actions/` is pinned by
 digest in `config/release/release-workflow.sha256`; every workflow must declare top-level
-`permissions: contents: read` with no job granting more. (Any workflow can be
+`permissions: contents: read`, and no job may grant more except the two
+environment-gated OIDC publication jobs (`publish-pypi` and `publish-npm`) in
+`.github/workflows/registry-publish.yml`, which grant `id-token: write` only inside
+their required-reviewer `publish-pypi` and `publish-npm` environments. (Any workflow can be
 edited into one that runs on a tag, so all of them are pinned.) Editing one
 fails `make check` and `make release-preflight` until the pin is updated, and
 tag verification checks the pin in the tagged commit. To change one:
@@ -193,11 +196,39 @@ For each crate in order (`CRATE=canonprims-core`, then
 
 ## 5b. PyPI and npm
 
-The registries receive exactly the signed files of the published GitHub
-release; nothing is rebuilt. Until trusted publishing is configured these are
-maintainer uploads with a scoped token kept outside the repository (a first
-upload needs an account- or organization-wide token, revoked afterwards: a
-project-scoped token can only be made once the project exists).
+The registries receive **exact signed files from the published GitHub release**;
+nothing is rebuilt.
+
+### Standard release (`v0.1.3+`, OIDC Trusted Publishing via `registry-publish.yml`)
+
+Once the project exists on PyPI (`canonprims` in the `3leaps` organization) and
+npm (`@3leaps/canonprims`), and GitHub Environments `publish-pypi` and
+`publish-npm` (required reviewer `@3leapsdave`, deployment restricted to `v*`
+tags) are configured as Trusted Publishers on PyPI and npm:
+
+- [ ] Stage and verify in dry-run mode on the release tag:
+  `gh workflow run registry-publish.yml --ref vX.Y.Z -f tag=vX.Y.Z -f registry=all -f dry_run=true`
+  Confirm the `verify` job restores and verifies `vX.Y.Z` against the committed
+  pin, downloads the published (non-draft) GitHub release, verifies both
+  minisign and OpenPGP subkey signatures on `SHA256SUMS` and `SHA512SUMS`, and
+  checks all 20 asset digests and wheel/npm metadata.
+- [ ] Dispatch the real OIDC publication on the release tag and approve the
+  `publish-pypi` and `publish-npm` environment deployments:
+  `gh workflow run registry-publish.yml --ref vX.Y.Z -f tag=vX.Y.Z -f registry=all -f dry_run=false`
+  - `publish-pypi` re-verifies the 5 staged `cp310-abi3` wheel digests against
+    the verified `SHA256SUMS`, uploads via `pypa/gh-action-pypi-publish` with
+    PEP 740 provenance attestations, and runs `scripts/release-verify-registries.py`.
+  - `publish-npm` re-verifies `3leaps-canonprims-X.Y.Z.tgz` against the
+    verified `SHA256SUMS` and `SHA512SUMS`, publishes with OIDC provenance
+    attestation (`npm publish ... --provenance --access public`), and runs
+    `scripts/release-verify-registries.py`.
+- [ ] Verify locally from the maintainer checkout:
+  `CANONPRIMS_RELEASE_TAG=vX.Y.Z make release-stage-published release-verify-registries`
+
+### First publication only (before the package exists on PyPI or npm)
+
+Because npm Trusted Publishing can only be configured on an existing package
+and a first PyPI upload creates the project:
 
 - [ ] `make release-stage-published`: downloads the published GitHub release
   into `dist/published` and verifies that the release is non-draft at the
@@ -216,6 +247,8 @@ project-scoped token can only be made once the project exists).
 - [ ] npm: `npm publish dist/published/3leaps-canonprims-X.Y.Z.tgz --access public`
   (authenticate via browser web-authn when prompted so no long-lived npm token
   is needed). Pass the tarball, not a directory: npm must not repack it.
+  - Register OIDC Trusted Publishing (`npm >= 11.5.1`):
+    `npm trust github @3leaps/canonprims --file registry-publish.yml --repo 3leaps/canonprims --env publish-npm --allow-publish -y`
   - One-time defensive bare-name redirector (`canonprims` ->
     `@3leaps/canonprims`): `make release-pack-npm-redirector`, publish
     `dist/npm-redirector/canonprims-X.Y.Z.tgz`, transfer `canonprims` to the
@@ -230,7 +263,9 @@ project-scoped token can only be made once the project exists).
   - npm (`@3leaps/canonprims@X.Y.Z`) serves the exact `dist.integrity`
     (`sha512-...`) and `dist.shasum` of the verified
     `3leaps-canonprims-X.Y.Z.tgz`.
-- [ ] Revoke a first-publication token.
+- [ ] Revoke a first-publication token and configure Trusted Publishers on PyPI
+  (`registry-publish.yml`, environment `publish-pypi`) and npm
+  (`registry-publish.yml`, environment `publish-npm`).
 
 ## 6. After the release
 

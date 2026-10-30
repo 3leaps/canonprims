@@ -1,0 +1,200 @@
+# canonprims OIDC registry publication (PyPI and npm)
+#
+# Dispatched by the maintainer with --ref vX.Y.Z after the signed GitHub
+# release is published. Nothing is rebuilt:
+#   1. verify (contents: read) restores and verifies the signed tag against the
+#      committed pin, checks that the tagged source is inert, downloads the
+#      published (non-draft) GitHub release, verifies both minisign and OpenPGP
+#      subkey signatures on SHA256SUMS and SHA512SUMS, verifies all 20 asset
+#      checksums and embedded wheel/npm metadata, and uploads the verified
+#      stage as a workflow artifact.
+#   2. publish-pypi and publish-npm run only when dry_run is false, are gated
+#      by the publish-pypi and publish-npm GitHub environments (required
+#      reviewer + v* tag deployment rule), hold id-token: write for OIDC
+#      Trusted Publishing only, re-verify the staged digests against the
+#      verified stage output before upload, and verify that PyPI and npm serve
+#      the exact signed bytes afterwards.
+
+name: Registry publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag (vX.Y.Z; must match --ref vX.Y.Z)
+        required: false
+        type: string
+      registry:
+        description: Registry to publish (all, pypi, or npm)
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - pypi
+          - npm
+      dry_run:
+        description: Stage and verify the published GitHub release without uploading to PyPI or npm
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22.23.4
+
+jobs:
+  verify:
+    name: Verify tags and stage published release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      object: ${{ steps.identity.outputs.object }}
+      commit: ${{ steps.identity.outputs.commit }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the pinned checker
+        run: |
+          set -euo pipefail
+          scripts/ci-install-pyyaml.sh python3 --user
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
+          name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"
+          version="${name#decernor_}"
+          version="${version%%_*}"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+            "https://github.com/3leaps/decernor/releases/download/v${version}/${name}" \
+            --output "$tool_dir/$name"
+          (cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")
+          tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
+          echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
+
+      - name: Restore the annotated tag, verify it, and stage the published GitHub release
+        id: identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          CANONPRIMS_RELEASE_TAG: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "dispatch with --ref vX.Y.Z" >&2; exit 1; }
+          [[ -z "$INPUT_TAG" || "$INPUT_TAG" == "$CANONPRIMS_RELEASE_TAG" ]] || {
+            echo "inputs.tag ($INPUT_TAG) must match --ref ($CANONPRIMS_RELEASE_TAG)" >&2
+            exit 1
+          }
+          ./scripts/release-restore-tag-ref.sh
+          source scripts/release-decernor.sh
+          resolve_release_decernor
+          export RELEASE_DECERNOR_BIN
+          ./scripts/release-validate-pin.sh
+          ./scripts/verify-pinned-tag.sh
+          python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"
+          ./scripts/release-stage-published.sh "$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"
+          version="$(tr -d '\r\n' < VERSION)"
+          object="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG")"
+          commit="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{}")"
+          {
+            echo "version=$version"
+            echo "object=$object"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified registry stage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: registry-stage
+          if-no-files-found: error
+          retention-days: 5
+          path: ${{ runner.temp }}/registry-stage/
+
+  publish-pypi:
+    name: Publish wheels to PyPI
+    needs: verify
+    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'pypi')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: publish-pypi
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Download verified registry stage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: registry-stage
+          path: dist/registry-stage
+
+      - name: Re-verify staged wheel digests against tagged commit
+        env:
+          STAGE_VERSION: ${{ needs.verify.outputs.version }}
+          STAGE_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: ./scripts/ci-prepare-pypi-publish.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage dist/pypi-wheels
+
+      - name: Publish wheels to PyPI with PEP 740 attestations
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/pypi-wheels
+          attestations: true
+
+      - name: Verify PyPI serves the signed wheel bytes
+        env:
+          STAGE_VERSION: ${{ needs.verify.outputs.version }}
+        run: python3 -I -B scripts/release-verify-registries.py dist/registry-stage "$STAGE_VERSION" pypi
+
+  publish-npm:
+    name: Publish tarball to npm
+    needs: verify
+    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'npm')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: publish-npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Download verified registry stage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: registry-stage
+          path: dist/registry-stage
+
+      - name: Re-verify staged tarball, publish to npm with OIDC provenance, and verify registry
+        env:
+          STAGE_VERSION: ${{ needs.verify.outputs.version }}
+          STAGE_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: ./scripts/ci-publish-npm-oidc.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage

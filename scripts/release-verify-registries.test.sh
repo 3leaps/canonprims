@@ -156,4 +156,16 @@ if command -v npm >/dev/null 2>&1; then
 	[[ -s "$scratch/redirector/canonprims-$version.tgz" ]]
 fi
 
+head_commit="$(git -C "$root" rev-parse HEAD)"
+repo_ver="$(tr -d ' \t\r\n' < "$root/VERSION")"
+if [[ "$repo_ver" == "$version" ]]; then
+	"$root/scripts/ci-prepare-pypi-publish.sh" "$version" "$head_commit" "$stage" "$scratch/pypi-wheels" >/dev/null
+	[[ "$(find "$scratch/pypi-wheels" -maxdepth 1 -name '*.whl' | wc -l | tr -d ' ')" == 5 ]]
+	if "$root/scripts/ci-prepare-pypi-publish.sh" "$version" "0000000000000000000000000000000000000000" "$stage" "$scratch/pypi-wheels-bad" >"$scratch/out" 2>&1; then
+		echo "error: accepted wrong commit in ci-prepare-pypi-publish.sh" >&2
+		exit 1
+	fi
+	grep -q "HEAD differs from verified stage commit" "$scratch/out"
+fi
+
 echo '[ok] registry verification and bare-name redirector controls'

@@ -50,6 +50,22 @@ FORBIDDEN_COMMANDS = re.compile(
 PROFILES = {
     "release.yml": {"images": [MANYLINUX_AMD64, MANYLINUX_ARM64, SBOM_IMAGE], "boundary": "release-identity.json"},
     "crates-verify.yml": {"images": [], "boundary": "scripts/ci-crate-verify.sh"},
+    "registry-publish.yml": {
+        "images": [],
+        "boundary": "./scripts/release-stage-published.sh",
+        "oidc": {
+            "publish-pypi": {
+                "environment": "publish-pypi",
+                "if": "inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'pypi')",
+                "actions": {"actions/checkout", "actions/download-artifact", "pypa/gh-action-pypi-publish"},
+            },
+            "publish-npm": {
+                "environment": "publish-npm",
+                "if": "inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'npm')",
+                "actions": {"actions/checkout", "actions/setup-node", "actions/download-artifact"},
+            },
+        },
+    },
 }
 SECRET = re.compile(r"(?i)\bsecrets\b|CARGO_REGISTRY_TOKEN|NODE_AUTH_TOKEN")
 # The one reviewed way to start a container from a step: the wheel build,
@@ -116,6 +132,13 @@ def check(text, profile):
     jobs = data.get("jobs")
     if not isinstance(jobs, dict) or "verify" not in jobs:
         fail("workflow jobs are missing")
+    oidc_specs = profile.get("oidc") or {}
+    if oidc_specs:
+        trigger = data.get("on") if "on" in data else data.get(True)
+        if not isinstance(trigger, dict) or set(trigger) != {"workflow_dispatch"}:
+            fail("OIDC workflow must trigger on workflow_dispatch only")
+        if set(jobs) != {"verify"} | set(oidc_specs):
+            fail("OIDC workflow job set differs from reviewed profile")
     for value in strings(data):
         if SECRET.search(value):
             fail("workflow registry or secret access")
@@ -123,8 +146,16 @@ def check(text, profile):
     for name, job in jobs.items():
         if not isinstance(job, dict):
             fail(f"{name}: job is not a mapping")
+        oidc_spec = oidc_specs.get(name)
         permissions = job.get("permissions")
-        if permissions is not None and (
+        if oidc_spec is not None:
+            if permissions != {"contents": "read", "id-token": "write"}:
+                fail(f"{name}: OIDC job permissions must be contents: read and id-token: write")
+            if job.get("environment") != oidc_spec["environment"]:
+                fail(f"{name}: OIDC job must require environment {oidc_spec['environment']}")
+            if job.get("if") != oidc_spec["if"]:
+                fail(f"{name}: OIDC job condition differs from reviewed dry_run/registry guard")
+        elif permissions is not None and (
             not isinstance(permissions, dict)
             or any(str(v).strip().lower() not in ("read", "none") for v in permissions.values())
         ):
@@ -137,7 +168,7 @@ def check(text, profile):
                 fail(f"{name}: moving or unreviewed runner image")
         elif label not in RUNNERS:
             fail(f"{name}: moving or unreviewed runner image")
-        if "services" in job or "continue-on-error" in job or "if" in job:
+        if "services" in job or "continue-on-error" in job or (oidc_spec is None and "if" in job):
             fail(f"{name}: services, continue-on-error and job conditions are not reviewed")
         matrix = (job.get("strategy") or {}).get("matrix")
         if matrix is not None and (not isinstance(matrix, dict) or set(matrix) != {"include"}):
@@ -154,6 +185,7 @@ def check(text, profile):
         steps += [s for s in job.get("steps") or [] if isinstance(s, dict)]
         if len(steps) != len(job.get("steps") or []) + (1 if "uses" in job else 0):
             fail(f"{name}: malformed step")
+        allowed_actions = oidc_spec["actions"] if oidc_spec is not None else ACTIONS
         for step in steps:
             if "if" in step or "continue-on-error" in step:
                 fail(f"{name}: step conditions and continue-on-error are not reviewed")
@@ -162,7 +194,7 @@ def check(text, profile):
             action = step.get("uses")
             if action is not None:
                 repo, sep, ref = str(action).partition("@")
-                if not sep or repo not in ACTIONS or not re.fullmatch(r"[0-9a-f]{40}", ref):
+                if not sep or repo not in allowed_actions or not re.fullmatch(r"[0-9a-f]{40}", ref):
                     fail("unreviewed release action")
             if FORBIDDEN_COMMANDS.search(shell_code(step.get("run", ""))):
                 fail("workflow release creation or publication")
@@ -193,6 +225,12 @@ def check(text, profile):
             fail("missing tag-set or anchor verification")
     if profile["boundary"] not in code:
         fail("missing artifact boundary")
+    if oidc_specs:
+        if not re.search(r'(?m)^\s*\./scripts/release-stage-published\.sh\s+"\$CANONPRIMS_RELEASE_TAG"\s+"\$RUNNER_TEMP/registry-stage"\s*$', code):
+            fail("verify: published release staging must write to $RUNNER_TEMP/registry-stage")
+        uploads = [s for s in (jobs["verify"].get("steps") or []) if isinstance(s, dict) and str(s.get("uses", "")).startswith("actions/upload-artifact@")]
+        if len(uploads) != 1 or (uploads[0].get("with") or {}).get("path") != "${{ runner.temp }}/registry-stage/":
+            fail("verify: registry-publish must upload exactly $RUNNER_TEMP/registry-stage")
 
 
 def shared_mutations(text):
@@ -236,6 +274,29 @@ def crates_verify_mutations(text):
         sub("scripts/ci-crate-verify.sh", "scripts/other.sh"),
         sub('"$CRATE" "$RUNNER_TEMP/crate-verification"', '"$CRATE" crates'),
         sub("path: ${{ runner.temp }}/crate-verification/", "path: crates/"),
+    ]
+
+
+def registry_publish_mutations(text):
+    def sub(old, new):
+        if old not in text:
+            fail(f"mutation anchor not found: {old!r}")
+        return text.replace(old, new, 1)
+
+    first_runs_on = "    runs-on: ubuntu-24.04\n"
+    return shared_mutations(text) + [
+        sub("on:\n  workflow_dispatch:\n", "on:\n  push:\n    tags: ['v*']\n  workflow_dispatch:\n"),
+        sub(first_runs_on, first_runs_on + "    permissions:\n      contents: read\n      id-token: write\n"),
+        sub("    environment: publish-pypi\n", ""),
+        sub("    environment: publish-npm\n", "    environment: publish-pypi\n"),
+        sub("      id-token: write\n", "      id-token: write\n      contents: write\n"),
+        sub("    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'pypi')\n", ""),
+        sub("    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'npm')\n", "    if: true\n"),
+        sub("    needs: verify\n", ""),
+        sub('./scripts/release-stage-published.sh "$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"', "./scripts/other.sh"),
+        sub('"$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"', '"$CANONPRIMS_RELEASE_TAG" dist/published'),
+        sub("path: ${{ runner.temp }}/registry-stage/", "path: dist/"),
+        sub("pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086", "pypa/gh-action-pypi-publish@release/v1"),
     ]
 
 
@@ -342,7 +403,12 @@ def main():
     text = open(sys.argv[2], encoding="utf-8").read()
     check(text, profile)
     if sys.argv[1] == "mutations":
-        cases = mutations(text) if name == "release.yml" else crates_verify_mutations(text)
+        if name == "release.yml":
+            cases = mutations(text)
+        elif name == "crates-verify.yml":
+            cases = crates_verify_mutations(text)
+        else:
+            cases = registry_publish_mutations(text)
         for index, mutated in enumerate(cases):
             try:
                 check(mutated, profile)
