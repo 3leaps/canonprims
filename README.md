@@ -160,7 +160,8 @@ two implementations agreeing.
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
-[MIT license](LICENSE-MIT) at your option.
+[MIT license](LICENSE-MIT) at your option. See [NOTICE](NOTICE) for project
+name and trademark notices.
 
 Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in this work, as defined in the Apache-2.0 license,

@@ -21,8 +21,9 @@ library, bindings, conformance corpus and `canon` command are unchanged from
   `make release-verify-registries`, `make release-stage`,
   `make release-crates-clean` and `make release-pack-npm-redirector`.
 - OpenPGP signer command-line pinning and default `~/.gnupg` keyring refusal,
-  Bash 3.2 empty-array expansion guard, Rust `canon-diff` hex-parsing parity
-  and Windows-portable surface test controls.
+  Bash 3.2 empty-array expansion guard, Rust `canon-diff` hex-parsing parity,
+  Windows-portable surface test controls, and verbatim `LICENSE-MIT` /
+  `LICENSE-APACHE` texts with `NOTICE` separated in root and binding packages.
 
 Details: [docs/releases/v0.1.3.md](docs/releases/v0.1.3.md).
 

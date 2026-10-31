@@ -45,6 +45,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   in `scripts/surface-scan.test.sh` and `scripts/content-check.test.sh`, and
   `npm` (`>= 10.0.0`) and `uv` (`>= 0.5.0`) tool minimum declarations in
   `.goneat/tools.yaml` and `config/doctor-versions.txt`
+- Verbatim `LICENSE-MIT` and `LICENSE-APACHE` texts with project name and
+  trademark notices separated into `NOTICE` at the repository root and in the
+  Python and TypeScript binding packages
 
 ## [0.1.2] - 2026-10-28
 

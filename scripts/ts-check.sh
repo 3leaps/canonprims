@@ -24,7 +24,7 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/canonprims-ts.XXXXXX")"
 trap 'rm -rf "${work}"' EXIT
 cd "${root}"
 
-for license in LICENSE-MIT LICENSE-APACHE; do
+for license in LICENSE-MIT LICENSE-APACHE NOTICE; do
   cmp -s "${license}" "${pkg}/${license}" ||
     { echo "ts-check: bindings/typescript/${license} differs from ${license}" >&2; exit 1; }
 done
@@ -82,7 +82,7 @@ tarball="$(cd "${pkg}" && npm pack --silent --pack-destination "${work}")"
 tarball="${work}/${tarball##*/}"
 [ "${tarball##*/}" = "3leaps-canonprims-${version}.tgz" ] || { echo "ts-check: unexpected tarball ${tarball##*/}" >&2; exit 1; }
 listed="$(tar -tzf "${tarball}" | LC_ALL=C sort | tr '\n' ' ')"
-want="package/LICENSE-APACHE package/LICENSE-MIT package/README.md package/dist/index.d.ts package/dist/index.js package/dist/wasm.d.ts package/dist/wasm.js package/package.json "
+want="package/LICENSE-APACHE package/LICENSE-MIT package/NOTICE package/README.md package/dist/index.d.ts package/dist/index.js package/dist/wasm.d.ts package/dist/wasm.js package/package.json "
 [ "${listed}" = "${want}" ] || { echo "ts-check: tarball contents differ: ${listed}" >&2; exit 1; }
 
 # A consumer project: the tarball, nothing else, no registry access.

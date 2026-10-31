@@ -18,7 +18,7 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": ["dist/index.js", "dist/index.d.ts", "dist/wasm.js", "dist/wasm.d.ts", "LICENSE-MIT", "LICENSE-APACHE", "README.md"],
+  "files": ["dist/index.js", "dist/index.d.ts", "dist/wasm.js", "dist/wasm.d.ts", "LICENSE-MIT", "LICENSE-APACHE", "NOTICE", "README.md"],
   "engines": {
     "node": ">=20"
   },
