@@ -3,7 +3,7 @@
 # Synthetic controls for scripts/release-verify-registries.py and
 # scripts/pack-npm-redirector.sh against a loopback HTTP server.
 set -euo pipefail
-unset GITHUB_ACTIONS CI CANONPRIMS_PYPI_API_URL CANONPRIMS_NPM_REGISTRY_URL CANONPRIMS_SIGSTORE_TEST_ROOT
+unset GITHUB_ACTIONS CI CANONPRIMS_PYPI_API_URL CANONPRIMS_NPM_REGISTRY_URL CANONPRIMS_SIGSTORE_TEST_ROOT CANONPRIMS_RELEASE_ANCHOR_FILE
 
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 scratch="$(mktemp -d)"

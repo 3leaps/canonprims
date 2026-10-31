@@ -94,6 +94,10 @@ JSON
 	cat >"$scratch/api/immutable-releases.json" <<'JSON'
 {"enabled": true}
 JSON
+
+	cat >"$scratch/api/release-v0.1.4.json" <<'JSON'
+{"tag_name": "v0.1.4", "draft": false, "immutable": true}
+JSON
 }
 
 cat >"$scratch/bin/gh" <<'SH'
@@ -131,6 +135,9 @@ repos/3leaps/canonprims/immutable-releases)
 	[[ "${FIXTURE_IMMUTABLE_403:-0}" == "0" ]] || exit 1
 	cat "$FIXTURE_API/immutable-releases.json"
 	;;
+repos/3leaps/canonprims/releases/tags/v0.1.4)
+	cat "$FIXTURE_API/release-v0.1.4.json"
+	;;
 *)
 	echo "unexpected endpoint: $endpoint" >&2
 	exit 1
@@ -140,7 +147,7 @@ SH
 chmod +x "$scratch/bin/gh"
 
 run_preflight() {
-	(cd "$repo" && PATH="$scratch/bin:$PATH" FIXTURE_API="$scratch/api" "$repo/scripts/release-github-preflight.sh" "$@") >"$scratch/out" 2>&1
+	(cd "$repo" && unset GITHUB_ACTIONS && PATH="$scratch/bin:$PATH" FIXTURE_API="$scratch/api" "$repo/scripts/release-github-preflight.sh" "$@") >"$scratch/out" 2>&1
 }
 
 expect_refused() {
@@ -218,6 +225,29 @@ write_pristine_api
 jq '.enabled = false' "$scratch/api/immutable-releases.json" >"$scratch/api/tmp.json"
 mv "$scratch/api/tmp.json" "$scratch/api/immutable-releases.json"
 expect_refused "immutable_releases is not enabled"
+write_pristine_api
+
+# Under GITHUB_ACTIONS=true (contents: read GITHUB_TOKEN without Administration
+# scope), redacted bypass_actors (null) and HTTP 403 on /immutable-releases fall
+# back to verifying .immutable == true on the published release for
+# CANONPRIMS_RELEASE_TAG, while still rejecting non-null wrong bypass_actors or
+# a mutable/draft release.
+jq 'del(.bypass_actors)' "$scratch/api/ruleset-25798917.json" >"$scratch/api/tmp.json"
+mv "$scratch/api/tmp.json" "$scratch/api/ruleset-25798917.json"
+(cd "$repo" && GITHUB_ACTIONS=true CANONPRIMS_RELEASE_TAG=v0.1.4 FIXTURE_IMMUTABLE_403=1 PATH="$scratch/bin:$PATH" FIXTURE_API="$scratch/api" "$repo/scripts/release-github-preflight.sh") >"$scratch/out" 2>&1
+jq '.bypass_actors = [{"actor_id": 1, "actor_type": "RepositoryRole", "bypass_mode": "always"}]' "$scratch/api/ruleset-25798917.json" >"$scratch/api/tmp.json"
+mv "$scratch/api/tmp.json" "$scratch/api/ruleset-25798917.json"
+if (cd "$repo" && GITHUB_ACTIONS=true CANONPRIMS_RELEASE_TAG=v0.1.4 FIXTURE_IMMUTABLE_403=1 PATH="$scratch/bin:$PATH" FIXTURE_API="$scratch/api" "$repo/scripts/release-github-preflight.sh") >"$scratch/out" 2>&1; then
+	echo "error: GITHUB_ACTIONS preflight accepted non-OrganizationAdmin bypass_actors" >&2
+	exit 1
+fi
+write_pristine_api
+jq '.immutable = false' "$scratch/api/release-v0.1.4.json" >"$scratch/api/tmp.json"
+mv "$scratch/api/tmp.json" "$scratch/api/release-v0.1.4.json"
+if (cd "$repo" && GITHUB_ACTIONS=true CANONPRIMS_RELEASE_TAG=v0.1.4 FIXTURE_IMMUTABLE_403=1 PATH="$scratch/bin:$PATH" FIXTURE_API="$scratch/api" "$repo/scripts/release-github-preflight.sh") >"$scratch/out" 2>&1; then
+	echo "error: GITHUB_ACTIONS preflight accepted mutable release" >&2
+	exit 1
+fi
 write_pristine_api
 
 echo '[ok] GitHub environment, tag ruleset, and immutable_releases preflight controls'
