@@ -53,7 +53,7 @@ while IFS= read -r line; do
 	[[ "$line" == worktree\ * ]] || continue
 	roots+=("${line#worktree }")
 done <<<"$worktrees"
-"${PYTHON:-python3}" -I "$root/scripts/surface-catalog-path.py" "$catalog" "${roots[@]}" 2>&3 ||
+"${PYTHON:-python3}" -I "$root/scripts/surface-catalog-path.py" "$catalog" ${roots[@]+"${roots[@]}"} 2>&3 ||
 	die 'the catalog location was refused'
 
 bin="${CANONPRIMS_LIMENSAFE_BIN:-limensafe}"
@@ -64,7 +64,7 @@ else
 fi
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/canonprims-surface.XXXXXX")"
-trap 'rm -rf "$work"' EXIT
+trap 'rc=$?; rm -rf "$work"; exit "$rc"' EXIT
 
 # scan LABEL ARGS...: one limensafe scan. A fresh report is required each time,
 # the exit status is read (0 clean, 1 findings, 2+ error), and the catalog must

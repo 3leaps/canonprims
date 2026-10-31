@@ -11,6 +11,7 @@ tag_identity
 tag_selector
 tag_approved_primary
 tag_key_home
+tag_signing_program
 # The checker is bound before any side effect (the fetch in tag_checkout
 # included); the committed pins are validated before signing.
 # shellcheck source=scripts/release-decernor.sh
@@ -21,15 +22,15 @@ tag_checkout
 [[ "$(git ls-tree HEAD -- keys/expected-fingerprints.txt | awk '{print $1}')" == 100644 ]] ||
 	tag_die 'committed fingerprint anchors are required before tagging'
 tag_load_set
-tags=("${tag_names[@]}")
-for tag in "${tags[@]}"; do
+tags=(${tag_names[@]+"${tag_names[@]}"})
+for tag in ${tags[@]+"${tags[@]}"}; do
 	[[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]] || tag_die "remote tag $tag already exists"
 	[[ -z "$(git show-ref --tags "refs/tags/$tag" || true)" ]] || tag_die "local tag $tag already exists"
 	tag_message_file "$tag" >/dev/null
 done
 export GIT_COMMITTER_NAME="$CANONPRIMS_TAGGER_NAME" GIT_COMMITTER_EMAIL="$CANONPRIMS_TAGGER_EMAIL"
-for tag in "${tags[@]}"; do
-	git tag -s -a --cleanup=verbatim -u "$CANONPRIMS_PGP_KEY_ID" -F "$(tag_message_file "$tag")" "$tag" HEAD
+for tag in ${tags[@]+"${tags[@]}"}; do
+	tag_signing_git tag -s -a --cleanup=verbatim -u "$CANONPRIMS_PGP_KEY_ID" -F "$(tag_message_file "$tag")" "$tag" HEAD
 done
 "$tag_root/scripts/release-verify-tag.sh"
 echo "[ok] ${#tags[@]} signed tag(s) created locally; nothing was pushed"

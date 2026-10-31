@@ -8,7 +8,7 @@ staging="${1:?staging directory required}"
 dest="${2:?destination required}"
 shift 2
 names=(expected-fingerprints.txt expected-fingerprints.ndjson)
-for name in "${names[@]}"; do
+for name in ${names[@]+"${names[@]}"}; do
 	[[ -s "$staging/$name" && ! -L "$staging/$name" ]] || {
 		echo 'error: incomplete anchor pair' >&2
 		exit 1
@@ -25,16 +25,16 @@ done
 mkdir -p "$dest"
 rollback() {
 	trap - EXIT INT TERM HUP
-	for name in "${names[@]}"; do rm -f "$dest/$name" "$dest/$name.new"; done
+	for name in ${names[@]+"${names[@]}"}; do rm -f "$dest/$name" "$dest/$name.new"; done
 }
 trap rollback EXIT
 trap 'rollback; exit 130' INT
 trap 'rollback; exit 143' TERM
 trap 'rollback; exit 129' HUP
-for name in "${names[@]}"; do
+for name in ${names[@]+"${names[@]}"}; do
 	(set -C && cat "$staging/$name" >"$dest/$name.new")
 done
-for name in "${names[@]}"; do
+for name in ${names[@]+"${names[@]}"}; do
 	mv -n "$dest/$name.new" "$dest/$name"
 	[[ ! -e "$dest/$name.new" ]] || {
 		echo "error: $dest/$name appeared during installation" >&2

@@ -12,6 +12,7 @@ release-crate-record
 release-crates
 release-crates-fetch
 release-gh
+release-github-preflight
 release-index-entry
 release-post-tag-selector
 release-promotion-recovery

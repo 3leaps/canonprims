@@ -5,6 +5,10 @@
 # `@3leaps/canonprims`, and is immediately deprecated with:
 #   npm deprecate canonprims "Canonical package is @3leaps/canonprims — install @3leaps/canonprims instead."
 #
+# Note on 0.x SemVer: `"@3leaps/canonprims": "^0.Y.Z"` resolves to `<0.(Y+1).0`.
+# Immediate deprecation of the bare name is mandatory so consumers never depend
+# on the unscoped package across 0.x minor bumps.
+#
 # Usage: scripts/pack-npm-redirector.sh <out-dir> [version]
 set -euo pipefail
 
@@ -21,7 +25,7 @@ trap 'rm -rf "$work"' EXIT
 pkg="$work/pkg"
 mkdir -p "$pkg"
 
-cp "$root/LICENSE-MIT" "$root/LICENSE-APACHE" "$pkg/"
+cp "$root/LICENSE-MIT" "$root/LICENSE-APACHE" "$root/NOTICE" "$pkg/"
 
 cat >"$pkg/index.js" <<'EOF'
 // SPDX-License-Identifier: MIT OR Apache-2.0
@@ -83,6 +87,7 @@ manifest = {
         "index.d.ts",
         "LICENSE-MIT",
         "LICENSE-APACHE",
+        "NOTICE",
         "README.md",
     ],
     "dependencies": {
@@ -102,7 +107,7 @@ tarball="$work/${tarball##*/}"
 	exit 1
 }
 listed="$(tar -tzf "$tarball" | LC_ALL=C sort | tr '\n' ' ')"
-want="package/LICENSE-APACHE package/LICENSE-MIT package/README.md package/index.d.ts package/index.js package/package.json "
+want="package/LICENSE-APACHE package/LICENSE-MIT package/NOTICE package/README.md package/index.d.ts package/index.js package/package.json "
 [[ "$listed" == "$want" ]] || {
 	echo "pack-npm-redirector: unexpected tarball contents: $listed" >&2
 	exit 1

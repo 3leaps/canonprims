@@ -15,46 +15,46 @@ fi
 # macOS ships GNU Bash 3.2 (/bin/bash), where expanding "${arr[@]}" or
 # "${arr[*]}" on an empty array fails under `set -u` (`unbound variable`) and
 # an EXIT trap can mask the non-zero status. Every script must parse under
-# bash -n, and every array that can be initialized empty (`name=()` or
-# `local/declare/typeset -a name`) must use `${name[@]+"${name[@]}"}` or
-# `${name[*]+"${name[*]}"}` at every `[@]`/`[*]` expansion site.
+# bash -n, and every `[@]`/`[*]` array expansion must use the Bash 3.2 guard
+# `${name[@]+"${name[@]}"}` or `${name[*]+"${name[*]}"}` regardless of how the
+# array was declared.
 for script in scripts/*.sh; do
 	bash -n "$script"
 done
-python3 -I - <<'PY'
+"${PYTHON:-python3}" -I - <<'PY'
 import pathlib
 import re
 import sys
+
+SAFE_GUARD = re.compile(
+    r'([ \t(=]"?)\$\{([A-Za-z_][A-Za-z0-9_]*)\[([@*])\]\+\"\$\{\2\[\3\]\}\"\}'
+)
+UNSAFE_ARRAY = re.compile(
+    r"\$\{([A-Za-z_][A-Za-z0-9_]*)\[(?!(?:[0-9]+|\$\{#\1\[@\]\}\s*-\s*1)\])"
+)
 
 for path in sorted(pathlib.Path("scripts").glob("*.sh")):
     if path.name in ("jq-portability.sh", "jq-portability.test.sh"):
         continue
     raw = path.read_text(encoding="utf-8")
-    # Fold line continuations before scanning declarations and expansions.
-    text = re.sub(r"\\\r?\n", "", raw)
-    empty_arrays = set(re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)=\(\s*\)", text))
-    for match in re.finditer(
-        r"(?m)(?:^|[;{&(]|\b(?:then|do|else)\b)\s*(?:local|declare|typeset)\b([^;#\n{}]*)",
-        text,
-    ):
-        decl = match.group(1)
-        if re.search(r"(?:^|\s)-[A-Za-z]*a[A-Za-z]*(?:\s|$)", decl):
-            for token in decl.split():
-                if token.startswith("-"):
-                    continue
-                if "=" not in token and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token):
-                    empty_arrays.add(token)
-    scrubbed = re.sub(
-        r"\$\{([A-Za-z_][A-Za-z0-9_]*)\[[@*]\]\+\"\$\{\1\[[@*]\]\}\"\}",
-        "",
-        text,
-    )
-    for name in sorted(empty_arrays):
-        if re.search(rf"\$\{{{name}\[[@*]\]\}}", scrubbed):
-            print(
-                f"jq-portability: {path}: empty array {name} expanded without Bash 3.2 ${{arr[@]+\"${{arr[@]}}\"}} guard",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    # Remove single-line safe guards before folding line continuations so a
+    # comment or partial prefix ending in "\" or "$" can never join with the
+    # next line to manufacture a fake safe guard, and never strip guards when
+    # non-comment lines use backtick command substitution.
+    scrubbed_lines = []
+    for raw_line in raw.split("\n"):
+        line = raw_line[:-1] if raw_line.endswith("\r") else raw_line
+        if "#" not in line and "`" not in line:
+            line = SAFE_GUARD.sub(r"\1", line)
+        scrubbed_lines.append(line)
+    scrubbed = "\n".join(scrubbed_lines)
+    folded = re.sub(r"\\\r?\n", "", scrubbed)
+    match = UNSAFE_ARRAY.search(scrubbed) or UNSAFE_ARRAY.search(folded)
+    if match:
+        print(
+            f"jq-portability: {path}: empty array {match.group(1)} expanded without Bash 3.2 ${{arr[@]+\"${{arr[@]}}\"}} guard",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 PY
 echo '[ok] jq variables avoid jq keywords'

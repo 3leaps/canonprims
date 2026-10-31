@@ -22,8 +22,8 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/canonprims-python.XXXXXX")"
 trap 'rm -rf "${work}"' EXIT
 cd "${root}"
 
-# The wheel's license files are copies of the root ones.
-for license in LICENSE-MIT LICENSE-APACHE; do
+# The wheel's license and notice files are copies of the root ones.
+for license in LICENSE-MIT LICENSE-APACHE NOTICE; do
   cmp -s "${license}" "bindings/python/${license}" ||
     { echo "python-check: bindings/python/${license} differs from ${license}" >&2; exit 1; }
 done
@@ -69,7 +69,7 @@ case "${wheels[0]##*/}" in *-cp310-abi3-*) ;; *) echo "python-check: wheel is no
 "${venv_python}" -I - <<'PY'
 import importlib.metadata as md
 files = {str(f).rsplit("/", 1)[-1] for f in md.files("canonprims") or []}
-missing = {"LICENSE-MIT", "LICENSE-APACHE", "py.typed"} - files
+missing = {"LICENSE-MIT", "LICENSE-APACHE", "NOTICE", "py.typed"} - files
 if missing:
     raise SystemExit(f"python-check: wheel lacks {sorted(missing)}")
 PY

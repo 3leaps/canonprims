@@ -55,7 +55,7 @@ crate="${1:-}"
 # tagged worktree once the steps below change into it.
 trusted_path=
 IFS=: read -r -a path_entries <<<"$PATH"
-for entry in "${path_entries[@]}"; do
+for entry in ${path_entries[@]+"${path_entries[@]}"}; do
 	[[ "$entry" == /* && -d "$entry" ]] || continue
 	resolved="$(cd "$entry" && pwd -P)"
 	case "$resolved" in "$root" | "$root"/*) continue ;; esac

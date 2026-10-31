@@ -75,7 +75,7 @@ resolve_release_decernor || {
 }
 tag_checkout
 tag_load_set
-for tag in "${tag_names[@]}"; do
+for tag in ${tag_names[@]+"${tag_names[@]}"}; do
 	tag_message_file "$tag" >/dev/null
 done
 

@@ -41,7 +41,7 @@ The Python and TypeScript bindings pass the same corpus as Rust and Go; see
 
 ## Status
 
-0.1.1 was the first release; 0.1.2 adds the Python and TypeScript bindings. While the version is 0.x the API may still change between minor releases.
+0.1.1 was the first release; 0.1.2 adds the Python and TypeScript bindings; 0.1.3 adds OIDC Trusted Publishing for PyPI and npm and published-release registry verification. While the version is 0.x the API may still change between minor releases.
 
 ## Use
 
@@ -56,7 +56,7 @@ $ canon jcs --check fixture.json    # exit 0 only if already canonical
 $ canon info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
 $ canon version --extended
-{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.2"}
+{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.3"}
 ```
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:
@@ -160,7 +160,8 @@ two implementations agreeing.
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
-[MIT license](LICENSE-MIT) at your option.
+[MIT license](LICENSE-MIT) at your option. See [NOTICE](NOTICE) for project
+name and trademark notices.
 
 Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in this work, as defined in the Apache-2.0 license,

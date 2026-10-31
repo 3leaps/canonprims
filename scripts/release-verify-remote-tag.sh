@@ -12,7 +12,7 @@ tag_version
 resolve_release_decernor
 export RELEASE_DECERNOR_BIN
 tag_load_set
-for tag in "${tag_names[@]}"; do
+for tag in ${tag_names[@]+"${tag_names[@]}"}; do
 	local_object="$(git rev-parse --verify --quiet "refs/tags/$tag")" || tag_die "local tag $tag is absent"
 	remote_object="$(git ls-remote --tags origin "refs/tags/$tag" | awk -v ref="refs/tags/$tag" '$2==ref {print $1}')"
 	[[ -n "$remote_object" ]] || tag_die "remote tag $tag is absent"

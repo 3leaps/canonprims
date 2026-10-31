@@ -88,9 +88,12 @@ tag verification checks the pin in the tagged commit. To change one:
 - [ ] Merge the release pack with an exact squash message whose body ends with
   the standard attribution footer, then check it: `git log -1 --format=%B`.
 - [ ] `make release-preflight` on the merged `main`: clean tree, on `main`,
-  equal to `origin/main`, the release source inert for Cargo (checked before
-  anything compiles), `make check`, `make release-tooling-test`,
-  `make release-check`, notes and changelog present.
+  equal to `origin/main`, `make release-github-preflight` (verifying that the
+  `publish-pypi` and `publish-npm` GitHub Environments require maintainer review
+  and allow only `v*` tags, the `Tag Publish Protection` ruleset is active on
+  `refs/tags/v*`, and `immutable_releases` is enabled), the release source inert
+  for Cargo (checked before anything compiles), `make check`,
+  `make release-tooling-test`, `make release-check`, notes and changelog present.
 - [ ] Main CI is green on this exact commit. Preflight alone is not enough.
 
 ## 2. Tags
@@ -217,11 +220,14 @@ tags) are configured as Trusted Publishers on PyPI and npm:
   `gh workflow run registry-publish.yml --ref vX.Y.Z -f tag=vX.Y.Z -f registry=all -f dry_run=false`
   - `publish-pypi` re-verifies the 5 staged `cp310-abi3` wheel digests against
     the verified `SHA256SUMS`, uploads via `pypa/gh-action-pypi-publish` with
-    PEP 740 provenance attestations, and runs `scripts/release-verify-registries.py`.
+    PEP 740 provenance attestations, and runs
+    `scripts/release-verify-registries.py --expect-provenance` (which verifies
+    both wheel SHA-256 digests and `/integrity/canonprims/X.Y.Z/<wheel>/provenance`).
   - `publish-npm` re-verifies `3leaps-canonprims-X.Y.Z.tgz` against the
     verified `SHA256SUMS` and `SHA512SUMS`, publishes with OIDC provenance
     attestation (`npm publish ... --provenance --access public`), and runs
-    `scripts/release-verify-registries.py`.
+    `scripts/release-verify-registries.py --expect-provenance` (which verifies
+    `dist.integrity`, `dist.shasum`, and `dist.attestations.provenance`).
 - [ ] Verify locally from the maintainer checkout:
   `CANONPRIMS_RELEASE_TAG=vX.Y.Z make release-stage-published release-verify-registries`
 
@@ -254,15 +260,21 @@ and a first PyPI upload creates the project:
     `dist/npm-redirector/canonprims-X.Y.Z.tgz`, transfer `canonprims` to the
     `3leaps` npm org, and deprecate it immediately:
     `npm deprecate canonprims "Canonical package is @3leaps/canonprims — install @3leaps/canonprims instead."`
-- [ ] `make release-verify-registries`: re-verifies the signatures and
-  checksums in `dist/published`, polls PyPI and npm (with bounded retry for
-  index/scan propagation), and checks that:
+    (Because `^0.Y.Z` resolves to `<0.(Y+1).0` under `0.x` SemVer, immediate
+    deprecation is mandatory so no consumer relies on the unscoped name across
+    `0.x` minor bumps.)
+- [ ] `scripts/release-verify-registries.sh --bootstrap-no-provenance`:
+  re-verifies the signatures and checksums in `dist/published`, polls PyPI and
+  npm (with bounded retry for index/scan propagation), and checks that:
   - PyPI (`https://pypi.org/pypi/canonprims/X.Y.Z/json`) reports
     `ownership.organization == "3leaps"` and the SHA-256 of every wheel equals
     its line in the verified `SHA256SUMS`.
   - npm (`@3leaps/canonprims@X.Y.Z`) serves the exact `dist.integrity`
     (`sha512-...`) and `dist.shasum` of the verified
     `3leaps-canonprims-X.Y.Z.tgz`.
+  (`--bootstrap-no-provenance` is used only for this manual first upload before
+  Trusted Publishing is registered; all subsequent releases require
+  `--expect-provenance`, the default.)
 - [ ] Revoke a first-publication token and configure Trusted Publishers on PyPI
   (`registry-publish.yml`, environment `publish-pypi`) and npm
   (`registry-publish.yml`, environment `publish-npm`).
@@ -275,3 +287,20 @@ and a first PyPI upload creates the project:
 - [ ] Someone other than the publisher verifies the published release: the
   tag, the anchors, the manifests and every digest (`CANONPRIMS_RELEASE_TAG=vX.Y.Z
   make release-stage-published release-verify-registries`).
+
+## Porting notes for sibling `*prims` repositories
+
+When adapting this release ceremony to other repositories in the family, two
+repository-specific switches apply:
+
+- **WASM (1 tarball) vs. N-API (8 packages) and `build.rs`:** `canonprims`
+  packages a single WebAssembly tarball (`3leaps-canonprims-X.Y.Z.tgz`) and
+  forbids `build.rs` across the entire tree in `scripts/release-source-check.py`.
+  Repositories with native FFI or N-API TypeScript bindings publish the 7
+  platform-specific npm packages before `@3leaps/<pkg>` and allowlist `build.rs`
+  only on the specific FFI/N-API crates that require a build script.
+- **Bare-name npm redirector (`^0.x` SemVer caveat):**
+  `scripts/pack-npm-redirector.sh` pins `"@3leaps/<pkg>": "^0.Y.Z"`, which under
+  `0.x` SemVer matches `<0.(Y+1).0`. Keep the immediate `npm deprecate <bare>`
+  step mandatory after the one-time redirector upload so nobody depends on the
+  unscoped package across `0.x` minor bumps.

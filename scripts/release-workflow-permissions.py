@@ -45,24 +45,355 @@ FORBIDDEN_COMMANDS = re.compile(
     r"|\bcargo\b[^\n]*\bpublish\b"
     r"|api/v1/crates|uploads\.github\.com|api\.github\.com/repos/[^\s\"']*/releases"
 )
+CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+UPLOAD_ARTIFACT_ACTION = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
+DOWNLOAD_ARTIFACT_ACTION = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+RUST_TOOLCHAIN_ACTION = "dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772"
+PYPI_PUBLISH_ACTION = "pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086"
+SETUP_NODE_ACTION = "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1"
+
+ALLOWED_STEP_ENV_KEYS = {
+    "ARCHIVE",
+    "CANONPRIMS_EXPECTED_TAG_OBJECT",
+    "CANONPRIMS_RELEASE_TAG",
+    "COMMIT",
+    "CRATE",
+    "EXPECTED_COMMIT",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "INPUT_TAG",
+    "PYTHON",
+    "STAGE_COMMIT",
+    "STAGE_VERSION",
+    "SUFFIX",
+    "TARGET",
+    "VERSION",
+}
+
+VERIFY_OUTPUTS = {
+    "version": "${{ steps.identity.outputs.version }}",
+    "object": "${{ steps.identity.outputs.object }}",
+    "commit": "${{ steps.identity.outputs.commit }}",
+}
+
 # What each reviewed workflow must contain beyond the shared rules: its
-# container images, exactly, and the artifact boundary its verify job writes.
+# trigger definition, workflow-level env, container images, artifact boundary,
+# verify job outputs, and complete ordered step structure for verify and OIDC
+# publishing jobs.
 PROFILES = {
-    "release.yml": {"images": [MANYLINUX_AMD64, MANYLINUX_ARM64, SBOM_IMAGE], "boundary": "release-identity.json"},
-    "crates-verify.yml": {"images": [], "boundary": "scripts/ci-crate-verify.sh"},
+    "release.yml": {
+        "trigger": {"push": {"tags": ["v*"]}},
+        "workflow_env": {"CARGO_TERM_COLOR": "always", "RUST_TOOLCHAIN": "1.88.0"},
+        "verify_outputs": VERIFY_OUTPUTS,
+        "images": [MANYLINUX_AMD64, MANYLINUX_ARM64, SBOM_IMAGE],
+        "boundary": "release-identity.json",
+        "verify_steps": [
+            {
+                "uses": CHECKOUT_ACTION,
+                "with": {"persist-credentials": False, "fetch-depth": 0},
+                "env": None,
+            },
+            {
+                "env": None,
+                "run": [
+                    "set -euo pipefail",
+                    "scripts/ci-install-pyyaml.sh python3 --user",
+                    'tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"',
+                    'name="$(awk \'{print $2}\' config/release/decernor-ci-sha256.txt)"',
+                    'version="${name#decernor_}"',
+                    'version="${version%%_*}"',
+                    'curl --proto \'=https\' --tlsv1.2 --fail --silent --show-error --location --retry 3   "https://github.com/3leaps/decernor/releases/download/v${version}/${name}"   --output "$tool_dir/$name"',
+                    '(cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")',
+                    'tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor',
+                    'echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"',
+                ],
+            },
+            {
+                "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}",
+                    "CANONPRIMS_RELEASE_TAG": "${{ github.ref_name }}",
+                },
+                "run": [
+                    "set -euo pipefail",
+                    "./scripts/release-restore-tag-ref.sh",
+                    "source scripts/release-decernor.sh",
+                    "resolve_release_decernor",
+                    "export RELEASE_DECERNOR_BIN",
+                    "./scripts/release-validate-pin.sh",
+                    "./scripts/verify-pinned-tag.sh",
+                    'python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"',
+                    'version="$(tr -d \'\\r\\n\' < VERSION)"',
+                    'object="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG")"',
+                    'commit="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{}")"',
+                    "{",
+                    'echo "version=$version"',
+                    'echo "object=$object"',
+                    'echo "commit=$commit"',
+                    '} >> "$GITHUB_OUTPUT"',
+                    'printf \'{"tag":"%s","object":"%s","commit":"%s"}\\n\'   "$CANONPRIMS_RELEASE_TAG" "$object" "$commit" > release-identity.json',
+                ],
+            },
+            {
+                "uses": UPLOAD_ARTIFACT_ACTION,
+                "with": {
+                    "name": "release-identity",
+                    "if-no-files-found": "error",
+                    "retention-days": 30,
+                    "path": "release-identity.json\nLICENSE-MIT\nLICENSE-APACHE\n",
+                },
+                "env": None,
+            },
+        ],
+    },
+    "crates-verify.yml": {
+        "trigger": {
+            "workflow_dispatch": {
+                "inputs": {
+                    "crate": {
+                        "description": "Crate to verify (a later entry of config/release/publishable-crates.txt)",
+                        "required": True,
+                    }
+                }
+            }
+        },
+        "workflow_env": {"CARGO_TERM_COLOR": "always", "RUST_TOOLCHAIN": "1.88.0"},
+        "verify_outputs": None,
+        "images": [],
+        "boundary": "scripts/ci-crate-verify.sh",
+        "verify_steps": [
+            {
+                "uses": CHECKOUT_ACTION,
+                "with": {"persist-credentials": False, "fetch-depth": 0},
+                "env": None,
+            },
+            {
+                "env": None,
+                "run": [
+                    "set -euo pipefail",
+                    "scripts/ci-install-pyyaml.sh python3 --user",
+                    'tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"',
+                    'name="$(awk \'{print $2}\' config/release/decernor-ci-sha256.txt)"',
+                    'version="${name#decernor_}"',
+                    'version="${version%%_*}"',
+                    'curl --proto \'=https\' --tlsv1.2 --fail --silent --show-error --location --retry 3   "https://github.com/3leaps/decernor/releases/download/v${version}/${name}"   --output "$tool_dir/$name"',
+                    '(cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")',
+                    'tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor',
+                    'echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"',
+                ],
+            },
+            {
+                "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}",
+                    "CANONPRIMS_RELEASE_TAG": "${{ github.ref_name }}",
+                },
+                "run": [
+                    "set -euo pipefail",
+                    '[[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "dispatch with --ref vX.Y.Z" >&2; exit 1; }',
+                    "./scripts/release-restore-tag-ref.sh",
+                    "source scripts/release-decernor.sh",
+                    "resolve_release_decernor",
+                    "export RELEASE_DECERNOR_BIN",
+                    "./scripts/release-validate-pin.sh",
+                    "./scripts/verify-pinned-tag.sh",
+                    'python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"',
+                ],
+            },
+            {
+                "uses": RUST_TOOLCHAIN_ACTION,
+                "with": {"toolchain": "${{ env.RUST_TOOLCHAIN }}"},
+                "env": None,
+            },
+            {
+                "env": {
+                    "CANONPRIMS_RELEASE_TAG": "${{ github.ref_name }}",
+                    "CRATE": "${{ inputs.crate }}",
+                },
+                "run": ['scripts/ci-crate-verify.sh "$CRATE" "$RUNNER_TEMP/crate-verification"'],
+            },
+            {
+                "uses": UPLOAD_ARTIFACT_ACTION,
+                "with": {
+                    "name": "crate-${{ inputs.crate }}",
+                    "if-no-files-found": "error",
+                    "retention-days": 30,
+                    "path": "${{ runner.temp }}/crate-verification/",
+                },
+                "env": None,
+            },
+        ],
+    },
     "registry-publish.yml": {
+        "trigger": {
+            "workflow_dispatch": {
+                "inputs": {
+                    "tag": {
+                        "description": "Published release tag (vX.Y.Z; must match --ref vX.Y.Z)",
+                        "required": False,
+                        "type": "string",
+                    },
+                    "registry": {
+                        "description": "Registry to publish (all, pypi, or npm)",
+                        "required": False,
+                        "default": "all",
+                        "type": "choice",
+                        "options": ["all", "pypi", "npm"],
+                    },
+                    "dry_run": {
+                        "description": "Stage and verify the published GitHub release without uploading to PyPI or npm",
+                        "required": False,
+                        "default": True,
+                        "type": "boolean",
+                    },
+                }
+            }
+        },
+        "workflow_env": {"NODE_VERSION": "22.23.4"},
+        "verify_outputs": VERIFY_OUTPUTS,
         "images": [],
         "boundary": "./scripts/release-stage-published.sh",
+        "verify_steps": [
+            {
+                "uses": CHECKOUT_ACTION,
+                "with": {"persist-credentials": False, "fetch-depth": 0},
+                "env": None,
+            },
+            {
+                "env": None,
+                "run": [
+                    "set -euo pipefail",
+                    "sudo apt-get update -qq",
+                    "sudo apt-get install -y -qq minisign",
+                    "scripts/ci-install-pyyaml.sh python3 --user",
+                    "minisign -v",
+                    'tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"',
+                    'name="$(awk \'{print $2}\' config/release/decernor-ci-sha256.txt)"',
+                    'version="${name#decernor_}"',
+                    'version="${version%%_*}"',
+                    'curl --proto \'=https\' --tlsv1.2 --fail --silent --show-error --location --retry 3   "https://github.com/3leaps/decernor/releases/download/v${version}/${name}"   --output "$tool_dir/$name"',
+                    '(cd "$tool_dir" && sha256sum --check "$GITHUB_WORKSPACE/config/release/decernor-ci-sha256.txt")',
+                    'tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor',
+                    'echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"',
+                ],
+            },
+            {
+                "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}",
+                    "GH_TOKEN": "${{ github.token }}",
+                    "CANONPRIMS_RELEASE_TAG": "${{ github.ref_name }}",
+                    "INPUT_TAG": "${{ inputs.tag }}",
+                },
+                "run": [
+                    "set -euo pipefail",
+                    '[[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "dispatch with --ref vX.Y.Z" >&2; exit 1; }',
+                    '[[ -z "$INPUT_TAG" || "$INPUT_TAG" == "$CANONPRIMS_RELEASE_TAG" ]] || {',
+                    'echo "inputs.tag ($INPUT_TAG) must match --ref ($CANONPRIMS_RELEASE_TAG)" >&2',
+                    "exit 1",
+                    "}",
+                    "./scripts/release-restore-tag-ref.sh",
+                    "source scripts/release-decernor.sh",
+                    "resolve_release_decernor",
+                    "export RELEASE_DECERNOR_BIN",
+                    "./scripts/release-validate-pin.sh",
+                    "./scripts/verify-pinned-tag.sh",
+                    'python3 -I scripts/release-source-check.py "$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{commit}")"',
+                    "./scripts/release-github-preflight.sh",
+                    './scripts/release-stage-published.sh "$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"',
+                    'version="$(tr -d \'\\r\\n\' < VERSION)"',
+                    'object="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG")"',
+                    'commit="$(git rev-parse "refs/tags/$CANONPRIMS_RELEASE_TAG^{}")"',
+                    "{",
+                    'echo "version=$version"',
+                    'echo "object=$object"',
+                    'echo "commit=$commit"',
+                    '} >> "$GITHUB_OUTPUT"',
+                ],
+            },
+            {
+                "uses": UPLOAD_ARTIFACT_ACTION,
+                "with": {
+                    "name": "registry-stage",
+                    "if-no-files-found": "error",
+                    "retention-days": 5,
+                    "path": "${{ runner.temp }}/registry-stage/",
+                },
+                "env": None,
+            },
+        ],
         "oidc": {
             "publish-pypi": {
                 "environment": "publish-pypi",
                 "if": "inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'pypi')",
                 "actions": {"actions/checkout", "actions/download-artifact", "pypa/gh-action-pypi-publish"},
+                "steps": [
+                    {
+                        "uses": CHECKOUT_ACTION,
+                        "with": {"persist-credentials": False, "fetch-depth": 0},
+                        "env": None,
+                    },
+                    {
+                        "uses": DOWNLOAD_ARTIFACT_ACTION,
+                        "with": {"name": "registry-stage", "path": "dist/registry-stage"},
+                        "env": None,
+                    },
+                    {
+                        "env": {
+                            "STAGE_VERSION": "${{ needs.verify.outputs.version }}",
+                            "STAGE_COMMIT": "${{ needs.verify.outputs.commit }}",
+                        },
+                        "run": [
+                            "set -euo pipefail",
+                            '[[ "$GITHUB_REF" == "refs/tags/v$STAGE_VERSION" && "${GITHUB_REF_TYPE:-tag}" == "tag" ]]',
+                            './scripts/ci-prepare-pypi-publish.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage dist/pypi-wheels',
+                        ],
+                    },
+                    {
+                        "uses": PYPI_PUBLISH_ACTION,
+                        "with": {"packages-dir": "dist/pypi-wheels", "attestations": True},
+                        "env": None,
+                    },
+                    {
+                        "env": {"STAGE_VERSION": "${{ needs.verify.outputs.version }}"},
+                        "run": [
+                            'python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage "$STAGE_VERSION" pypi'
+                        ],
+                    },
+                ],
             },
             "publish-npm": {
                 "environment": "publish-npm",
                 "if": "inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'npm')",
                 "actions": {"actions/checkout", "actions/setup-node", "actions/download-artifact"},
+                "steps": [
+                    {
+                        "uses": CHECKOUT_ACTION,
+                        "with": {"persist-credentials": False, "fetch-depth": 0},
+                        "env": None,
+                    },
+                    {
+                        "uses": SETUP_NODE_ACTION,
+                        "with": {
+                            "node-version": "${{ env.NODE_VERSION }}",
+                            "registry-url": "https://registry.npmjs.org",
+                        },
+                        "env": None,
+                    },
+                    {
+                        "uses": DOWNLOAD_ARTIFACT_ACTION,
+                        "with": {"name": "registry-stage", "path": "dist/registry-stage"},
+                        "env": None,
+                    },
+                    {
+                        "env": {
+                            "STAGE_VERSION": "${{ needs.verify.outputs.version }}",
+                            "STAGE_COMMIT": "${{ needs.verify.outputs.commit }}",
+                        },
+                        "run": [
+                            "set -euo pipefail",
+                            '[[ "$GITHUB_REF" == "refs/tags/v$STAGE_VERSION" && "${GITHUB_REF_TYPE:-tag}" == "tag" ]]',
+                            './scripts/ci-publish-npm-oidc.sh "$STAGE_VERSION" "$STAGE_COMMIT" dist/registry-stage',
+                        ],
+                    },
+                ],
             },
         },
     },
@@ -105,10 +436,84 @@ def fail(reason):
     raise ValueError(reason)
 
 
+def has_forbidden_control_char(text):
+    return any(
+        (ord(ch) < 0x20 and ch not in ("\n", "\t")) or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029)
+        for ch in text
+    )
+
+
+ALLOWED_STEP_ENV_ITEMS = frozenset(
+    {
+        ("ARCHIVE", "${{ matrix.archive }}"),
+        ("CANONPRIMS_EXPECTED_TAG_OBJECT", "${{ needs.verify.outputs.object }}"),
+        ("CANONPRIMS_RELEASE_TAG", "${{ github.ref_name }}"),
+        ("COMMIT", "${{ needs.verify.outputs.commit }}"),
+        ("CRATE", "${{ inputs.crate }}"),
+        ("EXPECTED_COMMIT", "${{ needs.verify.outputs.commit }}"),
+        ("GITHUB_TOKEN", "${{ github.token }}"),
+        ("GH_TOKEN", "${{ github.token }}"),
+        ("INPUT_TAG", "${{ inputs.tag }}"),
+        ("PYTHON", "${{ matrix.python }}"),
+        ("STAGE_COMMIT", "${{ needs.verify.outputs.commit }}"),
+        ("STAGE_VERSION", "${{ needs.verify.outputs.version }}"),
+        ("SUFFIX", "${{ matrix.artifact_suffix }}"),
+        ("TARGET", "${{ matrix.target }}"),
+        ("VERSION", "${{ needs.verify.outputs.version }}"),
+    }
+)
+
+
 def shell_code(run):
-    # A backslash-newline disappears in the shell, joining the two lines.
-    joined = re.sub(r"\\\n", "", str(run))
-    return "\n".join(line for line in joined.splitlines() if not line.lstrip().startswith("#"))
+    text = str(run)
+    if has_forbidden_control_char(text):
+        fail("non-LF control or line-separator character in run step")
+    if "${{" in text:
+        fail("GitHub expression interpolation in run step is not reviewed")
+    out = []
+    continued = ""
+    for line in text.split("\n"):
+        if not continued and line.lstrip(" \t").startswith("#"):
+            if line.rstrip(" \t").endswith("\\"):
+                fail("comment line ending with backslash is not reviewed")
+            continue
+        if continued and line.lstrip(" \t").startswith("#"):
+            fail("comment line after backslash line continuation is not reviewed")
+        if line.endswith("\\"):
+            continued += line[:-1]
+        else:
+            out.append(continued + line)
+            continued = ""
+    if continued:
+        out.append(continued)
+    return "\n".join(out)
+
+
+def stripped_run_lines(run):
+    return [ln.strip(" \t") for ln in shell_code(run).split("\n") if ln.strip(" \t")]
+
+
+def canonical_step(step, job_name):
+    if not isinstance(step, dict):
+        fail(f"{job_name}: step is not a mapping")
+    if not set(step).issubset({"name", "id", "uses", "with", "env", "run", "shell"}):
+        fail(f"{job_name}: unreviewed step key")
+    if ("uses" in step) == ("run" in step):
+        fail(f"{job_name}: step must specify either uses or run")
+    if "uses" in step:
+        if "shell" in step:
+            fail(f"{job_name}: uses step must not specify shell")
+        return {
+            "uses": step["uses"],
+            "with": step.get("with"),
+            "env": step.get("env"),
+        }
+    if "with" in step:
+        fail(f"{job_name}: run step must not specify with")
+    return {
+        "env": step.get("env"),
+        "run": stripped_run_lines(step["run"]),
+    }
 
 
 def strings(node):
@@ -127,25 +532,42 @@ def check(text, profile):
     data = yaml.safe_load(text)
     if not isinstance(data, dict):
         fail("workflow is not a mapping")
+    if not set(data).issubset({"name", "on", True, "permissions", "env", "jobs"}) or ("on" in data) == (True in data):
+        fail("workflow has unreviewed top-level keys")
     if data.get("permissions") != {"contents": "read"}:
         fail("workflow permissions must be exactly contents: read")
+    if "defaults" in data:
+        fail("workflow-level defaults are not reviewed")
+    if data.get("env") != profile["workflow_env"]:
+        fail("workflow-level env differs from reviewed profile")
+    trigger = data.get("on") if "on" in data else data.get(True)
+    if trigger != profile["trigger"]:
+        fail("workflow trigger differs from reviewed profile")
     jobs = data.get("jobs")
     if not isinstance(jobs, dict) or "verify" not in jobs:
         fail("workflow jobs are missing")
     oidc_specs = profile.get("oidc") or {}
     if oidc_specs:
-        trigger = data.get("on") if "on" in data else data.get(True)
-        if not isinstance(trigger, dict) or set(trigger) != {"workflow_dispatch"}:
-            fail("OIDC workflow must trigger on workflow_dispatch only")
         if set(jobs) != {"verify"} | set(oidc_specs):
             fail("OIDC workflow job set differs from reviewed profile")
     for value in strings(data):
+        if has_forbidden_control_char(value):
+            fail("non-LF control or line-separator character in workflow")
         if SECRET.search(value):
             fail("workflow registry or secret access")
     images = []
     for name, job in jobs.items():
         if not isinstance(job, dict):
             fail(f"{name}: job is not a mapping")
+        if "env" in job:
+            fail(f"{name}: job-level env is not reviewed")
+        if name == "verify":
+            if job.get("outputs") != profile["verify_outputs"]:
+                fail("verify: job outputs differ from reviewed profile")
+        elif "outputs" in job:
+            fail(f"{name}: job outputs are not reviewed")
+        if job.get("defaults") != {"run": {"shell": "bash"}}:
+            fail(f"{name}: job defaults must be exactly run.shell=bash")
         oidc_spec = oidc_specs.get(name)
         permissions = job.get("permissions")
         if oidc_spec is not None:
@@ -186,16 +608,43 @@ def check(text, profile):
         if len(steps) != len(job.get("steps") or []) + (1 if "uses" in job else 0):
             fail(f"{name}: malformed step")
         allowed_actions = oidc_spec["actions"] if oidc_spec is not None else ACTIONS
-        for step in steps:
-            if "if" in step or "continue-on-error" in step:
-                fail(f"{name}: step conditions and continue-on-error are not reviewed")
+        checkout_count = 0
+        for step_index, step in enumerate(steps):
+            if "if" in step or "continue-on-error" in step or "working-directory" in step:
+                fail(f"{name}: step conditions, continue-on-error and working-directory are not reviewed")
+            expected_id = "identity" if (name == "verify" and step_index == 2 and profile["verify_outputs"] is not None) else None
+            if step.get("id") != expected_id:
+                fail(f"{name}: step id differs from reviewed profile")
+            if "shell" in step and step.get("shell") != "bash":
+                fail(f"{name}: step shell must be bash")
+            canonical_step(step, name)
+            step_env = step.get("env")
+            if step_env is not None:
+                if (
+                    not isinstance(step_env, dict)
+                    or not step_env
+                    or any(not isinstance(k, str) or not isinstance(v, str) for k, v in step_env.items())
+                    or not set(step_env.items()).issubset(ALLOWED_STEP_ENV_ITEMS)
+                ):
+                    fail(f"{name}: unreviewed step env mapping")
             if re.search(r"\|\|\s*(true|:)|<<-?\s*['\"]?\w|\bset\s+\+e\b", shell_code(step.get("run", ""))):
                 fail(f"{name}: ignored failures and heredocs are not reviewed")
             action = step.get("uses")
             if action is not None:
+                if step_env is not None:
+                    fail(f"{name}: uses step must not specify env")
                 repo, sep, ref = str(action).partition("@")
                 if not sep or repo not in allowed_actions or not re.fullmatch(r"[0-9a-f]{40}", ref):
                     fail("unreviewed release action")
+                if repo == "actions/checkout":
+                    checkout_count += 1
+                    expected_checkout_with = (
+                        {"persist-credentials": False, "fetch-depth": 0}
+                        if name in ("verify", "publish-pypi", "publish-npm")
+                        else {"persist-credentials": False, "ref": "${{ needs.verify.outputs.commit }}"}
+                    )
+                    if step_index != 0 or checkout_count != 1 or step.get("with") != expected_checkout_with:
+                        fail(f"{name}: checkout step must be first with reviewed with mapping")
             if FORBIDDEN_COMMANDS.search(shell_code(step.get("run", ""))):
                 fail("workflow release creation or publication")
             image = container_run(shell_code(step.get("run", "")))
@@ -204,6 +653,8 @@ def check(text, profile):
             for value in strings({k: v for k, v in step.items() if k != "run"}):
                 if RUNTIME.search(re.sub(r"[\\'\"$`{}()]", "", value)):
                     fail("a container may start only from the reviewed wheel-build step")
+        if checkout_count != 1:
+            fail(f"{name}: job must have exactly one checkout step")
     # A crate verification job uploads exactly the directory the verifier
     # creates outside the checkout, so the artifact holds nothing else.
     for name, job in jobs.items():
@@ -219,6 +670,9 @@ def check(text, profile):
             fail(f"{name}: crate verification must upload exactly its output directory")
     if images != profile["images"]:
         fail("unreviewed container image")
+    actual_verify_steps = [canonical_step(s, "verify") for s in (jobs["verify"].get("steps") or [])]
+    if actual_verify_steps != profile["verify_steps"]:
+        fail("verify: verification steps differ from reviewed profile")
     code = "\n".join(shell_code(s.get("run", "")) for s in jobs["verify"].get("steps") or [] if isinstance(s, dict))
     for command in MANDATORY:
         if not re.search(r"(?m)^\s*" + re.escape(command), code):
@@ -226,8 +680,13 @@ def check(text, profile):
     if profile["boundary"] not in code:
         fail("missing artifact boundary")
     if oidc_specs:
-        if not re.search(r'(?m)^\s*\./scripts/release-stage-published\.sh\s+"\$CANONPRIMS_RELEASE_TAG"\s+"\$RUNNER_TEMP/registry-stage"\s*$', code):
-            fail("verify: published release staging must write to $RUNNER_TEMP/registry-stage")
+        for oidc_job_name, oidc_spec in oidc_specs.items():
+            actual_oidc_steps = [
+                canonical_step(s, oidc_job_name)
+                for s in (jobs[oidc_job_name].get("steps") or [])
+            ]
+            if actual_oidc_steps != oidc_spec["steps"]:
+                fail(f"{oidc_job_name}: OIDC job steps differ from reviewed profile")
         uploads = [s for s in (jobs["verify"].get("steps") or []) if isinstance(s, dict) and str(s.get("uses", "")).startswith("actions/upload-artifact@")]
         if len(uploads) != 1 or (uploads[0].get("with") or {}).get("path") != "${{ runner.temp }}/registry-stage/":
             fail("verify: registry-publish must upload exactly $RUNNER_TEMP/registry-stage")
@@ -246,9 +705,34 @@ def shared_mutations(text):
     return [
         sub("permissions:\n  contents: read", "permissions:\n  contents: write"),
         sub("permissions:\n  contents: read", "permissions: write-all"),
+        sub("permissions:\n  contents: read", "permissions:\n  contents: read\ndefaults:\n  run:\n    shell: true {0}"),
+        sub("env:\n", "env:\n  BASH_ENV: /tmp/evil.sh\n"),
+        sub("env:\n", "env:\n  BASH_FUNC_python3%%: '() { return 0; }'\n"),
+        sub(first_runs_on, first_runs_on + "    env:\n      BASH_ENV: /tmp/evil.sh\n"),
+        sub("        env:\n", "        env:\n          BASH_ENV: /tmp/evil.sh\n"),
+        sub("        env:\n", "        env:\n          BASH_FUNC_python3%%: '() { return 0; }'\n"),
+        sub("        shell: bash\n", "        shell: true {0}\n"),
+        sub("        shell: bash\n", "        shell: bash\n        working-directory: /tmp\n"),
+        sub(run, "        shell: bash -c true {0}\n" + run),
+        sub(run, "        shell: bash -n {0}\n" + run),
+        sub(run, run + "          # comment \\\n          exit 0\n"),
+        sub(run, run + "          true \\\n          # comment\n"),
+        sub(run, run + "          # ${{ fromJSON('\"\\nexit 0\\n#\"') }}\n"),
         sub(first_runs_on, first_runs_on + "    permissions: {contents: read, packages: write}\n"),
         sub(first_runs_on, "    runs-on: ubuntu-latest\n"),
         sub(checkout, "      - uses: unknown-org/action@main\n" + checkout),
+        sub(
+            "          persist-credentials: false\n          fetch-depth: 0\n",
+            "          persist-credentials: false\n          fetch-depth: 0\n          repository: attacker/example\n",
+        ),
+        sub(
+            "          persist-credentials: false\n          fetch-depth: 0\n",
+            "          persist-credentials: false\n          fetch-depth: 0\n          ref: main\n",
+        ),
+        sub(
+            "          persist-credentials: false\n          fetch-depth: 0\n",
+            "          persist-credentials: false\n          fetch-depth: 0\n          path: sub\n",
+        ),
         sub(run, run + "          gh release create v1.2.3\n"),
         sub(run, run + "          cargo publish -p canonprims-core\n"),
         sub(run, run + "          echo \"${{ secrets['CARGO_REGISTRY_TOKEN'] }}\"\n"),
@@ -283,8 +767,44 @@ def registry_publish_mutations(text):
             fail(f"mutation anchor not found: {old!r}")
         return text.replace(old, new, 1)
 
+    def preflight_sep_mutation(sep_char):
+        doc = yaml.safe_load(text)
+        step = doc["jobs"]["verify"]["steps"][2]
+        step["run"] = step["run"].replace(
+            "\n./scripts/release-github-preflight.sh\n",
+            f"\n# skipped{sep_char}./scripts/release-github-preflight.sh\n",
+            1,
+        )
+        return yaml.safe_dump(doc, sort_keys=False)
+
+    def reorder_pypi_publish_before_verify():
+        doc = yaml.safe_load(text)
+        steps = doc["jobs"]["publish-pypi"]["steps"]
+        steps[2], steps[3] = steps[3], steps[2]
+        return yaml.safe_dump(doc, sort_keys=False)
+
+    def drop_pypi_publish_step():
+        doc = yaml.safe_load(text)
+        del doc["jobs"]["publish-pypi"]["steps"][3]
+        return yaml.safe_dump(doc, sort_keys=False)
+
+    def drop_dry_run_input():
+        doc = yaml.safe_load(text)
+        trig = doc.get("on") if "on" in doc else doc.get(True)
+        del trig["workflow_dispatch"]["inputs"]["dry_run"]
+        return yaml.safe_dump(doc, sort_keys=False)
+
     first_runs_on = "    runs-on: ubuntu-24.04\n"
     return shared_mutations(text) + [
+        preflight_sep_mutation("\r"),
+        preflight_sep_mutation("\x0b"),
+        reorder_pypi_publish_before_verify(),
+        drop_pypi_publish_step(),
+        drop_dry_run_input(),
+        sub("        default: true\n", "        default: false\n"),
+        sub("        default: true\n        type: boolean\n", "        default: 'true'\n        type: string\n"),
+        sub("        options:\n          - all\n          - pypi\n          - npm\n", "        options:\n          - all\n"),
+        sub("      version: ${{ steps.identity.outputs.version }}\n", "      version: 0.0.0\n"),
         sub("on:\n  workflow_dispatch:\n", "on:\n  push:\n    tags: ['v*']\n  workflow_dispatch:\n"),
         sub(first_runs_on, first_runs_on + "    permissions:\n      contents: read\n      id-token: write\n"),
         sub("    environment: publish-pypi\n", ""),
@@ -293,10 +813,75 @@ def registry_publish_mutations(text):
         sub("    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'pypi')\n", ""),
         sub("    if: inputs.dry_run != true && (inputs.registry == 'all' || inputs.registry == 'npm')\n", "    if: true\n"),
         sub("    needs: verify\n", ""),
+        sub("          ./scripts/release-github-preflight.sh\n", "          # ./scripts/release-github-preflight.sh\n"),
+        sub(
+            "        run: python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \"$STAGE_VERSION\" pypi\n",
+            "        run: |\n          # ${{ fromJSON('\"\\nexit 0\\n#\"') }}\n          python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \"$STAGE_VERSION\" pypi\n",
+        ),
+        sub(
+            "        run: python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \"$STAGE_VERSION\" pypi\n",
+            "        run: \"# skipped\\rpython3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \\\"$STAGE_VERSION\\\" pypi\"\n",
+        ),
+        sub(
+            "        run: python3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \"$STAGE_VERSION\" pypi\n",
+            "        run: \"# skipped\\x0bpython3 -I -B scripts/release-verify-registries.py --expect-provenance dist/registry-stage \\\"$STAGE_VERSION\\\" pypi\"\n",
+        ),
+        sub(
+            "      - name: Verify PyPI serves the signed wheel bytes and PEP 740 provenance\n",
+            "      - name: Verify PyPI serves the signed wheel bytes and PEP 740 provenance\n        shell: bash -c true {0}\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          if false; then\n            ./scripts/release-github-preflight.sh\n          fi\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          if false; then ./scripts/release-github-preflight.sh; fi\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          false &&\n          ./scripts/release-github-preflight.sh\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          true ||\n          ./scripts/release-github-preflight.sh\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          function skip_preflight {\n            ./scripts/release-github-preflight.sh\n          }\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          select x in; do\n            ./scripts/release-github-preflight.sh\n          done\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            '          : "\n          ./scripts/release-github-preflight.sh\n          "\n',
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          {\n            ./scripts/release-github-preflight.sh\n          } || echo ignored\n",
+        ),
+        sub(
+            "          ./scripts/release-github-preflight.sh\n",
+            "          {\n            ./scripts/release-github-preflight.sh\n          } &\n",
+        ),
         sub('./scripts/release-stage-published.sh "$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"', "./scripts/other.sh"),
         sub('"$CANONPRIMS_RELEASE_TAG" "$RUNNER_TEMP/registry-stage"', '"$CANONPRIMS_RELEASE_TAG" dist/published'),
         sub("path: ${{ runner.temp }}/registry-stage/", "path: dist/"),
         sub("pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086", "pypa/gh-action-pypi-publish@release/v1"),
+        sub(
+            "          packages-dir: dist/pypi-wheels\n          attestations: true\n",
+            "          packages-dir: dist/pypi-wheels\n          attestations: false\n",
+        ),
+        sub(
+            "          packages-dir: dist/pypi-wheels\n          attestations: true\n",
+            "          packages-dir: dist/unverified\n          attestations: true\n",
+        ),
+        sub(
+            "          name: registry-stage\n          path: dist/registry-stage\n",
+            "          name: registry-stage\n          path: dist/registry-stage\n          run-id: 12345\n",
+        ),
     ]
 
 

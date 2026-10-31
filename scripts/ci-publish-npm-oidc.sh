@@ -95,4 +95,4 @@ printf 'registry=https://registry.npmjs.org/\nalways-auth=false\n' >"$npmrc"
 export NPM_CONFIG_USERCONFIG="$npmrc"
 
 npm publish "$tgz" --provenance --access public
-python3 -I -B "$root/scripts/release-verify-registries.py" "$stage_dir" "$version" npm
+python3 -I -B "$root/scripts/release-verify-registries.py" --expect-provenance "$stage_dir" "$version" npm
