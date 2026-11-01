@@ -71,7 +71,8 @@ check_environment() {
 }
 
 check_tag_ruleset() {
-	local rulesets_json ruleset_id ruleset_json
+	local rulesets_json ruleset_id ruleset_json actions_mode="false"
+	[[ "${GITHUB_ACTIONS:-}" == "true" ]] && actions_mode="true"
 	rulesets_json="$(release_gh api "repos/$CANONPRIMS_REPOSITORY/rulesets?per_page=100" 2>/dev/null)" ||
 		die "could not read rulesets for $CANONPRIMS_REPOSITORY"
 	ruleset_id="$(jq -r '
@@ -82,7 +83,10 @@ check_tag_ruleset() {
 
 	ruleset_json="$(release_gh api "repos/$CANONPRIMS_REPOSITORY/rulesets/$ruleset_id" 2>/dev/null)" ||
 		die "could not read ruleset $ruleset_id on $CANONPRIMS_REPOSITORY"
-	jq -e --arg repo "$CANONPRIMS_REPOSITORY" '
+	# GitHub omits bypass_actors (null) when read by an Actions GITHUB_TOKEN
+	# with contents: read (no Administration scope); maintainer preflight still
+	# requires the exact OrganizationAdmin bypass_actors array.
+	jq -e --arg repo "$CANONPRIMS_REPOSITORY" --arg actions "$actions_mode" '
 		.name == "Tag Publish Protection" and
 		.source_type == "Repository" and
 		.source == $repo and
@@ -93,19 +97,36 @@ check_tag_ruleset() {
 		all(.conditions.ref_name.include[]; . == "refs/tags/v*" or . == "refs/tags/go/*/v*") and
 		(.rules | length) == 4 and
 		([.rules[].type] | sort) == ["creation", "deletion", "non_fast_forward", "update"] and
-		.bypass_actors == [{"actor_id": null, "actor_type": "OrganizationAdmin", "bypass_mode": "always"}]
+		(
+			.bypass_actors == [{"actor_id": null, "actor_type": "OrganizationAdmin", "bypass_mode": "always"}] or
+			($actions == "true" and .bypass_actors == null)
+		)
 	' >/dev/null <<<"$ruleset_json" ||
 		die "ruleset 'Tag Publish Protection' does not match the required tag protection policy"
 	echo "[ok] GitHub ruleset 'Tag Publish Protection': active on refs/tags/v*"
 }
 
 check_immutable_releases() {
-	local imm_json
-	imm_json="$(release_gh api "repos/$CANONPRIMS_REPOSITORY/immutable-releases" 2>/dev/null)" ||
-		die "could not read repos/$CANONPRIMS_REPOSITORY/immutable-releases (authoritative immutable_releases setting required)"
-	jq -e '.enabled == true' >/dev/null <<<"$imm_json" ||
-		die "immutable_releases is not enabled on $CANONPRIMS_REPOSITORY"
-	echo "[ok] GitHub immutable_releases: enabled (verified via /immutable-releases)"
+	local imm_json rel_json tag
+	if imm_json="$(release_gh api "repos/$CANONPRIMS_REPOSITORY/immutable-releases" 2>/dev/null)"; then
+		jq -e '.enabled == true' >/dev/null <<<"$imm_json" ||
+			die "immutable_releases is not enabled on $CANONPRIMS_REPOSITORY"
+		echo "[ok] GitHub immutable_releases: enabled (verified via /immutable-releases)"
+		return 0
+	fi
+	# Under GitHub Actions, GITHUB_TOKEN (contents: read) has no Administration
+	# scope to read /immutable-releases; verify .immutable == true on the
+	# published release for CANONPRIMS_RELEASE_TAG instead.
+	if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+		tag="$(release_tag)"
+		rel_json="$(release_gh api "repos/$CANONPRIMS_REPOSITORY/releases/tags/$tag" 2>/dev/null)" ||
+			die "could not read release $tag on $CANONPRIMS_REPOSITORY to verify immutability"
+		jq -e --arg want_tag "$tag" '.tag_name == $want_tag and .draft == false and .immutable == true' >/dev/null <<<"$rel_json" ||
+			die "published release $tag is not immutable on $CANONPRIMS_REPOSITORY"
+		echo "[ok] GitHub immutable_releases: enabled (verified on published release $tag)"
+		return 0
+	fi
+	die "could not read repos/$CANONPRIMS_REPOSITORY/immutable-releases (authoritative immutable_releases setting required)"
 }
 
 check_environment publish-pypi

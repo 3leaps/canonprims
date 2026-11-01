@@ -6,7 +6,24 @@ The latest three releases, newest first. The complete history is in
 
 ---
 
-## v0.1.3 - 2026-10-30
+## v0.1.4 - 2026-10-31
+
+Release preflight alignment for read-only GitHub Actions `GITHUB_TOKEN`
+execution inside `registry-publish.yml`. The library, bindings, conformance
+corpus and `canon` command are unchanged from 0.1.3.
+
+- `scripts/release-github-preflight.sh`: handles `GITHUB_TOKEN` (`contents: read`)
+  responses under `GITHUB_ACTIONS=true` (redacted `bypass_actors: null` on tag
+  rulesets and release `.immutable == true` verification when
+  `/immutable-releases` requires `Administration` scope), while keeping strict
+  admin checks on maintainer preflight.
+- Records `v0.1.3` arm64 runner image versions in `docs/releases/v0.1.3.md`.
+
+Details: [docs/releases/v0.1.4.md](docs/releases/v0.1.4.md).
+
+---
+
+## v0.1.3 - 2026-10-31
 
 OIDC Trusted Publishing for PyPI and npm, published-release staging and live
 registry digest verification, and release-script portability hardening. The
@@ -41,20 +58,3 @@ byte-for-byte agreement with Rust.
 - Both are signed release assets; the registry packages are those files.
 
 Details: [docs/releases/v0.1.2.md](docs/releases/v0.1.2.md).
-
----
-
-## v0.1.1 - 2026-10-27
-
-The first published release: the RFC 8785 JSON Canonicalization Scheme in Rust and in
-pure Go, gated against one conformance corpus and in byte-for-byte agreement.
-
-- Rust crates `canonprims-core` and `canonprims-json` on crates.io.
-- Go module `github.com/3leaps/canonprims`, package `canon`, standard library
-  only and cgo-free.
-- The `canon` command for linux amd64/arm64, darwin arm64 and windows
-  amd64/arm64.
-- One signed tag, `v0.1.1`, for the crates and the Go module. (A `v0.1.0`
-  tag exists but was never released.)
-
-Details: [docs/releases/v0.1.1.md](docs/releases/v0.1.1.md).
