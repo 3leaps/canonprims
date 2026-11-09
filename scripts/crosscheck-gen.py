@@ -6,7 +6,12 @@ Writes one hex-encoded input per line. Inputs mix well-formed documents,
 hostile numbers and strings, and byte-level mutations of both, so the two
 implementations are compared on refusals as well as on output.
 
-Usage: crosscheck-gen.py <seed> <count>
+With the optional `compose` argument the inputs are shaped for the
+composition helpers instead: arrays with repeated elements (reordered
+members, respelled numbers) for the set operations, and NDJSON with
+framing defects for the NDJSON operations.
+
+Usage: crosscheck-gen.py <seed> <count> [compose]
 """
 
 from __future__ import annotations
@@ -71,17 +76,41 @@ def mutate(r: random.Random, data: bytes) -> bytes:
     return bytes(b)
 
 
+SAME = [
+    ("1", "1.0"), ("-0", "0"), ("1e21", "1E21"), ('"\\u0041"', '"A"'),
+    ('{"a":1,"b":2}', '{"b":2,"a":1}'), ("[1.0]", "[1]"),
+]
+
+
+def compose_doc(r: random.Random) -> bytes:
+    elements = [rand_value(r, 3) for _ in range(r.randint(0, 5))]
+    if r.random() < 0.3:
+        a, b = r.choice(SAME)
+        elements[r.randint(0, len(elements)):0] = [a]
+        elements[r.randint(0, len(elements)):0] = [b]
+    if r.random() < 0.5:
+        ws = r.choice(["", " ", "\t"])
+        return ("[" + ws + ("," + ws).join(elements) + ws + "]").encode("utf-8")
+    lines = [ws + e + ws for e in elements for ws in [r.choice(["", " ", "\t"])]]
+    sep = r.choice(["\n"] * 6 + ["\r\n", "\n\n", "\n \n"])
+    text = sep.join(lines)
+    if r.random() < 0.85:
+        text += "\n"
+    return text.encode("utf-8")
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
+    if len(argv) not in (3, 4) or (len(argv) == 4 and argv[3] != "compose"):
         sys.stderr.write(__doc__ or "")
         return 2
+    compose = len(argv) == 4
     r = random.Random(int(argv[1]))
     # Binary stdout: the protocol is LF-terminated lines, and text mode would
     # write CRLF on Windows.
     out = sys.stdout.buffer
     for _ in range(int(argv[2])):
-        doc = rand_value(r, 0).encode("utf-8")
-        if r.random() < 0.3:
+        doc = compose_doc(r) if compose else rand_value(r, 0).encode("utf-8")
+        if r.random() < (0.1 if compose else 0.3):
             doc = mutate(r, doc)
         out.write(doc.hex().encode("ascii") + b"\n")
     return 0

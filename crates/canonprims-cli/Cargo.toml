@@ -1,6 +1,6 @@
 [package]
 name = "canonprims-cli"
-description = "Canonical serialization for structured data (RFC 8785 and successors): the canon command"
+description = "Canonical serialization for structured data (RFC 8785 and successors): the canonprims command"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,7 +11,7 @@ authors.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "canon"
+name = "canonprims"
 path = "src/main.rs"
 
 [dependencies]

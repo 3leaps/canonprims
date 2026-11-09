@@ -76,7 +76,7 @@ fail() {
     fi
 }
 ./scripts/release-publish.sh "$scratch/local" >/dev/null
-for name in canon-1.2.3-linux-amd64.tar.gz SHA256SUMS SHA256SUMS.minisig; do
+for name in canonprims-1.2.3-linux-amd64.tar.gz SHA256SUMS SHA256SUMS.minisig; do
     printf poison >"$scratch/remote/$name"
     fail ./scripts/release-publish.sh "$scratch/local"
     cp "$scratch/local/$name" "$scratch/remote/$name"

@@ -49,7 +49,7 @@ case "$1 $2" in
   case "$name" in
    cli-*)
     suffix="${name#cli-}"; ext=tar.gz; [[ "$suffix" == windows-* ]] && ext=zip
-    [[ "$suffix" != "${MISSING_SUFFIX:-}" ]] && printf fixture > "$dir/canon-1.2.3-$suffix.$ext" || true ;;
+    [[ "$suffix" != "${MISSING_SUFFIX:-}" ]] && printf fixture > "$dir/canonprims-1.2.3-$suffix.$ext" || true ;;
    wheel-*)
     suffix="${name#wheel-}"
     case "$suffix" in

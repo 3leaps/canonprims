@@ -103,7 +103,7 @@ MIT OR Apache-2.0. All dependencies must stay permissively licensed.
 | `scripts/canonical-json-corpus.py` | Corpus authoring table |
 | `crates/canonprims-core` | Schemes, refusal codes, limits, digests |
 | `crates/canonprims-json` | RFC 8785 over a strict I-JSON loader |
-| `crates/canonprims-cli` | The `canon` command |
+| `crates/canonprims-cli` | The `canonprims` command |
 | `go.mod`, `canon/` | Pure-Go twin (root module, standard library only) |
 | `scripts/crosscheck.sh` | Rust/Go byte-for-byte agreement |
 | `bindings/python` | Python binding (PyO3); its own Cargo workspace, never a release crate |

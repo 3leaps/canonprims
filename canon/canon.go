@@ -48,7 +48,10 @@ func DefaultLimits() Limits {
 // Code is a normative refusal code.
 type Code string
 
-// Refusal codes. NotCanonical is returned only by Check.
+// Refusal codes. NotCanonical is returned only by Check and by the helpers
+// that require canonical input (CheckCanonicalSet, VectorOfCanonical,
+// AssembleCanonicalSet); DuplicateSetElement and NotAnArray only by the
+// canonical-set helpers.
 const (
 	TooLarge               Code = "too_large"
 	InvalidUTF8            Code = "invalid_utf8"
@@ -60,6 +63,8 @@ const (
 	IntegerOutsideBinary64 Code = "integer_outside_binary64"
 	TooDeep                Code = "too_deep"
 	NotCanonical           Code = "not_canonical"
+	DuplicateSetElement    Code = "duplicate_set_element"
+	NotAnArray             Code = "not_an_array"
 )
 
 // Refusal reports an input outside the scheme's domain (or, from Check, an

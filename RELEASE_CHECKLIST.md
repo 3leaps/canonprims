@@ -83,7 +83,7 @@ tag verification checks the pin in the tagged commit. To change one:
   tag). Every `## [x.y.z]` heading needs its footer definition.
 - [ ] `docs/releases/vX.Y.Z.md`: the cut notes, starting with `# vX.Y.Z`. They
   record the `conformance/canonical-json/v0/MANIFEST.json` sha256 and the
-  Rust/Go crosscheck seeds and input count, and state that `canon` verifies no
+  Rust/Go crosscheck seeds and input count, and state that `canonprims` verifies no
   signatures (so it embeds no key).
 - [ ] Merge the release pack with an exact squash message whose body ends with
   the standard attribution footer, then check it: `git log -1 --format=%B`.
@@ -145,8 +145,9 @@ commit as inert git objects and never run its scripts.
   `make release-stage` first, inspect `dist/release/SHA256SUMS`, and then run
   `make release-sign`, `make release-upload` and `make release-publish` without
   re-running `release-clean`.)
-  - Expected assets: `canon-X.Y.Z-{linux-amd64,linux-arm64,darwin-arm64}.tar.gz`,
-    `canon-X.Y.Z-{windows-amd64,windows-arm64}.zip`,
+  - Expected assets: `canonprims-X.Y.Z-{linux-amd64,linux-arm64,darwin-arm64}.tar.gz`,
+    `canonprims-X.Y.Z-{windows-amd64,windows-arm64}.zip` (`canon-X.Y.Z-*` for
+    0.1.0 through 0.1.4),
     `canonprims-X.Y.Z-cp310-abi3-{manylinux_2_17_x86_64.manylinux2014_x86_64,manylinux_2_17_aarch64.manylinux2014_aarch64,macosx_11_0_arm64,win_amd64,win_arm64}.whl`,
     `3leaps-canonprims-X.Y.Z.tgz`,
     `canonprims-X.Y.Z-src.tar.gz`, `sbom-X.Y.Z.cdx.json`,

@@ -3,11 +3,65 @@
 //! Differential driver (docs/spec/jcs-rfc8785.md, "Conformance harness
 //! protocol"): one hex-encoded input per stdin line, one result per stdout
 //! line, default limits.
+//!
+//! An optional argument selects the operation, exactly as the Go driver
+//! (`canon/internal/difftool`) does: `jcs` (default), `vector`, `sort-set`,
+//! `check-set`, `ndjson[:N]`, `ndjson-set[:N]`. An unknown one exits 2.
 
 use std::io::{self, BufRead, BufWriter, Write};
+use std::num::NonZeroUsize;
 use std::process::ExitCode;
 
-use canonprims_json::canonprims_core::Limits;
+use canonprims_json::canonprims_core::{Limits, Refusal};
+
+type Operation = Box<dyn Fn(&[u8], &Limits) -> Result<Vec<u8>, Refusal>>;
+
+/// `name` or `name:N` with N plain decimal digits, at least 1.
+fn head_of(mode: &str, name: &str) -> Option<Option<NonZeroUsize>> {
+    if mode == name {
+        return Some(None);
+    }
+    let rest = mode.strip_prefix(name)?.strip_prefix(':')?;
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some(Some(rest.parse::<NonZeroUsize>().ok()?))
+}
+
+fn operation(mode: &str) -> Option<Operation> {
+    match mode {
+        "" | "jcs" => return Some(Box::new(canonprims_json::canonicalize)),
+        "vector" => {
+            return Some(Box::new(|i, l| {
+                canonprims_json::vector(i, l).map(|v| v.to_json())
+            }))
+        }
+        "sort-set" => return Some(Box::new(canonprims_json::sort_canonical_set)),
+        "check-set" => {
+            return Some(Box::new(|i, l| {
+                canonprims_json::check_canonical_set(i, l).map(|()| i.to_vec())
+            }))
+        }
+        _ => {}
+    }
+    if let Some(head) = head_of(mode, "ndjson") {
+        return Some(Box::new(move |i, l| {
+            canonprims_json::canonicalize_ndjson(i, head, l)
+        }));
+    }
+    if let Some(head) = head_of(mode, "ndjson-set") {
+        return Some(Box::new(move |i, l| {
+            let elements = canonprims_json::ndjson_elements(i, head, l)?;
+            // As the command does: the lines were bounded when selected.
+            let unbounded = Limits {
+                max_bytes: usize::MAX,
+                ..*l
+            };
+            canonprims_json::assemble_canonical_set(&elements, &unbounded)
+        }));
+    }
+    None
+}
 
 fn unhex(line: &str) -> Option<Vec<u8>> {
     let bytes = line.as_bytes();
@@ -23,6 +77,11 @@ fn unhex(line: &str) -> Option<Vec<u8>> {
 }
 
 fn main() -> ExitCode {
+    let mode = std::env::args().nth(1).unwrap_or_default();
+    let Some(op) = operation(&mode) else {
+        eprintln!("canon-diff: unknown operation {mode:?}");
+        return ExitCode::from(2);
+    };
     let limits = Limits::default();
     let mut stdin = io::stdin().lock();
     let mut out = BufWriter::new(io::stdout().lock());
@@ -46,7 +105,7 @@ fn main() -> ExitCode {
             eprintln!("canon-diff: line is not hex");
             return ExitCode::from(2);
         };
-        let written = match canonprims_json::canonicalize(&input, &limits) {
+        let written = match op(&input, &limits) {
             Ok(bytes) => {
                 let mut hex = String::with_capacity(bytes.len() * 2 + 4);
                 hex.push_str("ok ");
