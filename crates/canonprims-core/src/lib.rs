@@ -78,7 +78,9 @@ impl Refusal {
     }
 }
 
-/// Refusal codes. `NotCanonical` is only produced by `check`.
+/// Refusal codes. `NotCanonical` is only produced by `check` and by the
+/// helpers that require canonical input; `DuplicateSetElement` and
+/// `NotAnArray` only by the canonical-set helpers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Code {
@@ -103,10 +105,17 @@ pub enum Code {
     /// The input is in the domain but is not byte-identical to its
     /// canonical form.
     NotCanonical,
+    /// A canonical set holds two elements with identical canonical bytes.
+    /// Produced only by the canonical-set helpers.
+    DuplicateSetElement,
+    /// A canonical set's top-level value is not an array. Produced only by
+    /// the canonical-set helpers.
+    NotAnArray,
 }
 
 impl Code {
-    /// Every code, in spec order.
+    /// Every code the scheme verbs (`canonicalize`, `check`, `digest`) can
+    /// produce, in spec order.
     pub const ALL: &'static [Code] = &[
         Code::TooLarge,
         Code::InvalidUtf8,
@@ -119,6 +128,9 @@ impl Code {
         Code::TooDeep,
         Code::NotCanonical,
     ];
+
+    /// The codes produced only by the canonical-set helpers, in spec order.
+    pub const SET: &'static [Code] = &[Code::NotAnArray, Code::DuplicateSetElement];
 
     /// The wire name, for example `duplicate_member`.
     pub fn as_str(self) -> &'static str {
@@ -133,6 +145,8 @@ impl Code {
             Code::TooDeep => "too_deep",
             Code::TooLarge => "too_large",
             Code::NotCanonical => "not_canonical",
+            Code::DuplicateSetElement => "duplicate_set_element",
+            Code::NotAnArray => "not_an_array",
         }
     }
 }
@@ -271,6 +285,13 @@ mod tests {
                 "not_canonical",
             ]
         );
+    }
+
+    #[test]
+    fn set_code_names_are_the_spec_names() {
+        let names: Vec<_> = Code::SET.iter().map(|c| c.as_str()).collect();
+        assert_eq!(names, ["not_an_array", "duplicate_set_element"]);
+        assert!(Code::SET.iter().all(|c| !Code::ALL.contains(c)));
     }
 
     #[test]

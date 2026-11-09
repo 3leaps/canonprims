@@ -76,7 +76,7 @@ verified digest.
 
 ## Not applicable
 
-- The `canon` binary verifies no signatures, so it embeds no key.
+- The `canonprims` binary verifies no signatures, so it embeds no key.
 - No signing key has been retired; there are no retired pins.
 - The build verifies no third-party tool with a minisign key; CI tools are
   pinned by SHA-256 in `config/ci-tools.sha256`.

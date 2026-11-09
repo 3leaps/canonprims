@@ -6,6 +6,12 @@
 // "ok <hex of canonical bytes>" or "<refusal code>". It always uses the
 // default limits, exits 0 at end of input, and exits 2 on a line that is not
 // valid hex or when a write fails (a truncated result must never exit 0).
+//
+// An optional argument selects the operation applied to each input:
+// "jcs" (the default), "vector" (the vector JSON), "sort-set", "check-set"
+// (writes the input when it is already a canonical set), "ndjson[:N]" and
+// "ndjson-set[:N]" (NDJSON elements assembled as a canonical set). N is the
+// head; without it every line is used. An unknown operation exits 2.
 package main
 
 import (
@@ -14,16 +20,77 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/3leaps/canonprims/canon"
 )
 
 func main() {
-	os.Exit(run(os.Stdin, os.Stdout, os.Stderr))
+	mode := ""
+	if len(os.Args) > 1 {
+		mode = os.Args[1]
+	}
+	os.Exit(run(mode, os.Stdin, os.Stdout, os.Stderr))
 }
 
-func run(stdin io.Reader, stdout, stderr io.Writer) int {
+type operation func(in []byte, lim canon.Limits) ([]byte, error)
+
+// headOf parses the optional ":N" suffix of an NDJSON mode.
+func headOf(mode, name string) (int, bool) {
+	if mode == name {
+		return 0, true
+	}
+	rest, ok := strings.CutPrefix(mode, name+":")
+	if !ok || rest == "" || strings.TrimLeft(rest, "0123456789") != "" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(rest)
+	return n, err == nil && n >= 1
+}
+
+func operationFor(mode string) (operation, bool) {
+	switch mode {
+	case "", "jcs":
+		return func(in []byte, l canon.Limits) ([]byte, error) { return canon.Canonicalize(canon.JCS, in, l) }, true
+	case "vector":
+		return func(in []byte, l canon.Limits) ([]byte, error) {
+			v, err := canon.VectorOf(in, l)
+			if err != nil {
+				return nil, err
+			}
+			return v.JSON(), nil
+		}, true
+	case "sort-set":
+		return canon.SortCanonicalSet, true
+	case "check-set":
+		return func(in []byte, l canon.Limits) ([]byte, error) { return in, canon.CheckCanonicalSet(in, l) }, true
+	}
+	if head, ok := headOf(mode, "ndjson"); ok {
+		return func(in []byte, l canon.Limits) ([]byte, error) { return canon.CanonicalizeNDJSON(in, head, l) }, true
+	}
+	if head, ok := headOf(mode, "ndjson-set"); ok {
+		return func(in []byte, l canon.Limits) ([]byte, error) {
+			elements, err := canon.NDJSONElements(in, head, l)
+			if err != nil {
+				return nil, err
+			}
+			// As the command does: the lines were bounded when selected.
+			l.MaxBytes = math.MaxInt
+			return canon.AssembleCanonicalSet(elements, l)
+		}, true
+	}
+	return nil, false
+}
+
+func run(mode string, stdin io.Reader, stdout, stderr io.Writer) int {
+	op, ok := operationFor(mode)
+	if !ok {
+		_, _ = fmt.Fprintf(stderr, "difftool: unknown operation %q\n", mode)
+		return 2
+	}
 	r := bufio.NewReaderSize(stdin, 1<<20)
 	w := bufio.NewWriterSize(stdout, 1<<20)
 	// fail reports to stderr after flushing whatever results were written.
@@ -65,7 +132,7 @@ func run(stdin io.Reader, stdout, stderr io.Writer) int {
 			return fail("difftool: line %d: not valid hex\n", lineNo)
 		}
 		var werr error
-		out, cerr := canon.Canonicalize(canon.JCS, in, lim)
+		out, cerr := op(in, lim)
 		if cerr != nil {
 			var ref canon.Refusal
 			if !errors.As(cerr, &ref) {

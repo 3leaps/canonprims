@@ -38,16 +38,27 @@ release_tag() {
     printf '%s\n' "$tag"
 }
 
+# The command-line archive prefix of a release: the binary was named canon
+# through 0.1.4 and canonprims from 0.1.5, so staging and verifying a
+# published older release still expects its own asset names.
+release_cli_prefix() {
+    case "$1" in
+    0.1.[0-4]) printf 'canon\n' ;;
+    *) printf 'canonprims\n' ;;
+    esac
+}
+
 release_base_assets() {
-    local version
+    local version cli
     version="$(release_tag)"
     version="${version#v}"
+    cli="$(release_cli_prefix "$version")"
     printf '%s\n' LICENSE-APACHE LICENSE-MIT "sbom-${version}.cdx.json" "canonprims-${version}-src.tar.gz"
     local platform ext
     for platform in linux-amd64 linux-arm64 darwin-arm64 windows-amd64 windows-arm64; do
         ext=tar.gz
         [[ "$platform" == windows-* ]] && ext=zip
-        printf 'canon-%s-%s.%s\n' "$version" "$platform" "$ext"
+        printf '%s-%s-%s.%s\n' "$cli" "$version" "$platform" "$ext"
     done
     release_binding_assets "$version"
 }

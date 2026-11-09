@@ -16,9 +16,14 @@
 
 use canonprims_core::{Code, DigestAlg, Limits, Refusal, Scheme, SchemeInfo};
 
+mod compose;
 mod number;
 
 pub use canonprims_core;
+pub use compose::{
+    assemble_canonical_set, canonicalize_ndjson, check_canonical_set, ndjson_elements,
+    sort_canonical_set, vector, Vector,
+};
 
 /// `sha256:` of the `canonical-json/v0` corpus `MANIFEST.json` this build is
 /// gated against. The corpus test fails if the vendored manifest differs.

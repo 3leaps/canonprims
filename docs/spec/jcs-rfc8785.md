@@ -211,6 +211,69 @@ is `unknown_scheme`. An unknown digest algorithm is `unknown_algorithm`.
 These are not refusal codes. Each language represents them as its own
 error kind, and they never appear in the corpus.
 
+## Composition helpers
+
+Helpers built on `canonicalize` for test vectors, NDJSON journals and
+canonical sets. They are part of the Rust crate `canonprims-json` and the Go
+package `canon`, which agree on their output and refusal codes (offsets are
+informative, as above); the bindings do not expose them. Each takes the same
+limits as `canonicalize`. As there, `max_bytes` bounds the input, not the
+output: canonical bytes can be longer than the text they came from (`1e21`
+becomes `1e+21`), and an assembled array adds its brackets and commas. Two refusal codes
+belong to the set helpers only, and are not produced by the verbs above:
+
+| Code | Meaning |
+| --- | --- |
+| `not_an_array` | A canonical set's top-level value is not an array |
+| `duplicate_set_element` | Two elements of a canonical set have the same canonical bytes |
+
+**Vector.** The canonical bytes of an input together with their byte length
+and `sha256:` digest, written as one canonical JSON object:
+
+    {"byte_length":N,"canonical":"<canonical bytes as a JSON string>","digest":"sha256:<hex>","scheme":"jcs/rfc8785"}
+
+A vector is made from an input (refusals as `canonicalize`) or from bytes
+that must already be canonical (refusals as `check`).
+
+**NDJSON prefix.** The input is read as lines, from its start: all of them,
+or exactly the first `head` (at least 1). Rust takes the head as an optional
+non-zero count; Go takes an int where zero or a negative value means every
+line, so a Go caller that needs a bound must pass a positive head. For each
+selected line, in order, the first defect wins:
+
+1. The line's end (its LF, or the end of input when there is none) lies
+   beyond `max_bytes`: `too_large`. Only selected lines count; bytes after
+   them are never examined, and no more than `max_bytes` bytes are scanned
+   for a line's LF.
+2. The line has no LF: `invalid_json`.
+3. The line ends with CR LF: `invalid_json`.
+4. The line is empty or holds only spaces, tabs and CRs: `invalid_json`.
+5. The line, without its LF, is canonicalized with `max_depth` one less
+   (each line is an element of the array); its refusal is returned, with the
+   offset counted from the start of the input.
+
+Then empty input, or fewer lines than `head`, is `invalid_json`. A
+`max_depth` of 0 is `too_deep` before any line is read. The result is the
+canonical lines joined as one array, `[` line `,` line ... `]`, in input
+order.
+
+**Canonical set.** The input is canonicalized (its refusal is returned);
+then a top-level value that is not an array is `not_an_array`. The elements'
+canonical bytes are sorted in ascending unsigned byte order, and two equal
+neighbours are `duplicate_set_element`. Elements that differ only in member
+order, escaping or number spelling have the same canonical bytes and are
+duplicates. The result is the sorted elements as one array.
+
+- **Check set**: the input must be byte-identical to its canonical set;
+  otherwise the canonical-set refusal, or `not_canonical` at the first
+  differing byte.
+- **Assemble set**: from a list of elements, each of which must already be
+  canonical with `max_depth` one less (checked in list order, with `check`'s
+  refusals), the canonical set of those elements. The elements are the
+  input: before each element is examined, the array they make so far
+  (brackets, elements and commas) must fit in `max_bytes`, else `too_large`;
+  an empty list needs room for `[]`. A `max_depth` of 0 is `too_deep`.
+
 ## Conformance harness protocol
 
 Every implementation provides a corpus test and a differential driver that
@@ -234,4 +297,7 @@ empty input. For each line it writes exactly one line to stdout:
     <refusal code>
 
 The driver always uses the default limits. It exits 0 when it reaches the end
-of its input. A line that is not valid hex is a usage error: exit 2.
+of its input. An optional argument selects a composition helper instead
+of `canonicalize`: `vector`, `sort-set`, `check-set` (writes the input when it
+is already a canonical set), `ndjson[:N]` and `ndjson-set[:N]` (the NDJSON
+lines assembled as a canonical set), where `N` is the head. A line that is not valid hex is a usage error: exit 2.

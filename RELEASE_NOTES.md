@@ -6,6 +6,26 @@ The latest three releases, newest first. The complete history is in
 
 ---
 
+## v0.1.5 - 2026-11-09
+
+The command-line binary is now `canonprims` (it was `canon`), with three new
+`jcs` modes for golden vectors, NDJSON prefixes and canonical sets, and the
+library helpers behind them in Rust and Go. The Go package path, crate names,
+bindings and conformance corpus are unchanged.
+
+- `canonprims jcs --vector`, `--ndjson-array [--head N]` and `--sort-set`.
+  `--ndjson-array` and `--sort-set` combine with each other and with one of
+  `--vector` or `--digest`; `--sort-set` also combines with `--check`.
+- `canonprims-json` and Go package `canon`: vector, strict NDJSON-prefix and
+  canonical-set helpers, with refusal codes `not_an_array` and
+  `duplicate_set_element`, held byte for byte equal by `make crosscheck`.
+- Release archives are `canonprims-X.Y.Z-<platform>`; staging and verifying a
+  published 0.1.0 to 0.1.4 release still expects its `canon-*` names.
+
+Details: [docs/releases/v0.1.5.md](docs/releases/v0.1.5.md).
+
+---
+
 ## v0.1.4 - 2026-10-31
 
 Release preflight alignment for read-only GitHub Actions `GITHUB_TOKEN`
@@ -43,18 +63,3 @@ library, bindings, conformance corpus and `canon` command are unchanged from
   `LICENSE-APACHE` texts with `NOTICE` separated in root and binding packages.
 
 Details: [docs/releases/v0.1.3.md](docs/releases/v0.1.3.md).
-
----
-
-## v0.1.2 - 2026-10-28
-
-Python and TypeScript bindings, gated by the same conformance corpus and in
-byte-for-byte agreement with Rust.
-
-- Python package `canonprims`: abi3 wheels for CPython 3.10 and later on
-  linux amd64/arm64, darwin arm64 and windows amd64/arm64.
-- npm package `@3leaps/canonprims`: one WebAssembly module, no runtime
-  dependencies.
-- Both are signed release assets; the registry packages are those files.
-
-Details: [docs/releases/v0.1.2.md](docs/releases/v0.1.2.md).

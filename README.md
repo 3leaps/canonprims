@@ -9,8 +9,8 @@ digest. Its first scheme is the RFC 8785 JSON Canonicalization Scheme
 
 There are two implementations:
 
-- **Rust** crates (`canonprims-core`, `canonprims-json`) and the `canon`
-  command.
+- **Rust** crates (`canonprims-core`, `canonprims-json`) and the
+  `canonprims` command.
 - **Go**, a pure-Go package (`github.com/3leaps/canonprims/canon`) in the
   root module, that uses only the standard library and needs no cgo.
 
@@ -41,23 +41,36 @@ The Python and TypeScript bindings pass the same corpus as Rust and Go; see
 
 ## Status
 
-0.1.1 was the first release; 0.1.2 adds the Python and TypeScript bindings; 0.1.3 adds OIDC Trusted Publishing for PyPI and npm and published-release registry verification. While the version is 0.x the API may still change between minor releases.
+0.1.1 was the first release; 0.1.2 adds the Python and TypeScript bindings; 0.1.3 adds OIDC Trusted Publishing for PyPI and npm and published-release registry verification; 0.1.5 renames the command from `canon` to `canonprims` and adds vector, NDJSON-prefix and canonical-set helpers. While the version is 0.x the API may still change between minor releases.
 
 ## Use
 
 ### Command line
 
 ```console
-$ echo '{"b": 2, "a": [1.0, 1e21]}' | canon jcs
+$ echo '{"b": 2, "a": [1.0, 1e21]}' | canonprims jcs
 {"a":[1,1e+21],"b":2}
-$ echo '{"b": 2, "a": 1}' | canon jcs --digest
+$ echo '{"b": 2, "a": 1}' | canonprims jcs --digest
 sha256:...
-$ canon jcs --check fixture.json    # exit 0 only if already canonical
-$ canon info
+$ canonprims jcs --check fixture.json    # exit 0 only if already canonical
+$ echo '{"b": 2, "a": 1}' | canonprims jcs --vector
+{"byte_length":13,"canonical":"{\"a\":1,\"b\":2}","digest":"sha256:...","scheme":"jcs/rfc8785"}
+$ canonprims jcs --ndjson-array --head 4 --digest journal.ndjson   # first 4 lines as one array
+sha256:...
+$ echo '[{"id":"b"},{"id":"a"}]' | canonprims jcs --sort-set
+[{"id":"a"},{"id":"b"}]
+$ canonprims info
 {"corpus":"canonical-json/v0","corpus_digest":"sha256:...","scheme":"jcs/rfc8785","spec":"RFC 8785"}
-$ canon version --extended
-{"name":"canon","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.3"}
+$ canonprims version --extended
+{"name":"canonprims","schemes":[{"corpus":"canonical-json/v0",...}],"version":"0.1.5"}
 ```
+
+`--vector` writes the canonical bytes, their length and digest as one
+canonical JSON object. `--ndjson-array` reads strict LF-terminated NDJSON
+(no CR LF, no blank or unterminated line) as one array; `--head N` uses
+exactly the first N lines. `--sort-set` sorts an array's elements by their
+canonical bytes and refuses duplicates; with `--check` it requires the input
+to be sorted already. The command was named `canon` through 0.1.4.
 
 The command writes data to stdout and diagnostics to stderr. Exit codes:
 
@@ -78,6 +91,9 @@ let limits = Limits::default();
 let bytes = canonprims_json::canonicalize(br#"{"b":2,"a":1}"#, &limits)?;
 assert_eq!(bytes, br#"{"a":1,"b":2}"#);
 let digest = canonprims_json::digest(br#"{"b":2,"a":1}"#, &limits, DigestAlg::Sha256)?;
+let vector = canonprims_json::vector(br#"{"b":2,"a":1}"#, &limits)?; // .to_json()
+let set = canonprims_json::sort_canonical_set(br#"[2,1]"#, &limits)?;
+let cut = canonprims_json::canonicalize_ndjson(b"{\"a\":1}\n", None, &limits)?;
 ```
 
 ### Go
@@ -87,6 +103,9 @@ import "github.com/3leaps/canonprims/canon"
 
 out, err := canon.Canonicalize(canon.JCS, input, canon.DefaultLimits())
 d, err := canon.Digest(canon.JCS, input, canon.DefaultLimits(), "sha256")
+v, err := canon.VectorOf(input, canon.DefaultLimits()) // v.JSON()
+set, err := canon.SortCanonicalSet([]byte(`[2,1]`), canon.DefaultLimits())
+cut, err := canon.CanonicalizeNDJSON(journal, 4, canon.DefaultLimits())
 ```
 
 ## What it refuses
@@ -96,7 +115,8 @@ with a named code that is the same in both languages:
 
 `invalid_json`, `invalid_utf8`, `duplicate_member`, `lone_surrogate`,
 `noncharacter`, `non_finite_number`, `integer_outside_binary64`, `too_deep`,
-`too_large`.
+`too_large`. The canonical-set helpers add `not_an_array` and
+`duplicate_set_element`.
 
 Every call takes explicit limits on input size, nesting depth, object
 members and string length. When a limit is exceeded the call returns a

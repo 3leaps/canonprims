@@ -2,7 +2,7 @@
 #
 # On a v* tag: verify the release tag (vX.Y.Z) against
 # the public pin committed in the tagged commit, check the committed anchors
-# with the digest-pinned checker, then build the canon CLI on the five native
+# with the digest-pinned checker, then build the canonprims CLI on the five native
 # cells, the Python wheel for the same five platforms, the npm package and an
 # SBOM, and keep them as workflow artifacts.
 #
@@ -173,12 +173,12 @@ jobs:
           mkdir -p dist/cli
           cp LICENSE-MIT LICENSE-APACHE dist/cli/
           if [ "$ARCHIVE" = "zip" ]; then
-            cp "target/$TARGET/release/canon.exe" dist/cli/canon.exe
-            powershell.exe -NoProfile -Command "Compress-Archive -Path dist/cli/* -DestinationPath canon-${VERSION}-${SUFFIX}.zip"
+            cp "target/$TARGET/release/canonprims.exe" dist/cli/canonprims.exe
+            powershell.exe -NoProfile -Command "Compress-Archive -Path dist/cli/* -DestinationPath canonprims-${VERSION}-${SUFFIX}.zip"
           else
-            cp "target/$TARGET/release/canon" dist/cli/canon
+            cp "target/$TARGET/release/canonprims" dist/cli/canonprims
             # No AppleDouble (._*) members from the macOS tar.
-            COPYFILE_DISABLE=1 tar -czf "canon-${VERSION}-${SUFFIX}.tar.gz" -C dist/cli .
+            COPYFILE_DISABLE=1 tar -czf "canonprims-${VERSION}-${SUFFIX}.tar.gz" -C dist/cli .
           fi
 
       - name: Upload CLI artifact
@@ -187,7 +187,7 @@ jobs:
           name: cli-${{ matrix.artifact_suffix }}
           if-no-files-found: error
           retention-days: 30
-          path: canon-${{ needs.verify.outputs.version }}-${{ matrix.artifact_suffix }}.${{ matrix.archive }}
+          path: canonprims-${{ needs.verify.outputs.version }}-${{ matrix.artifact_suffix }}.${{ matrix.archive }}
 
   build-wheels:
     # The Python binding's abi3 wheel per platform (scripts/build-wheel.sh):

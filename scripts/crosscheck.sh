@@ -7,6 +7,8 @@
 #    must be identical.
 # 2. Both differential drivers read the same generated inputs; their outputs
 #    must be identical.
+# 3. The same, for each composition helper (vectors, NDJSON prefixes and
+#    canonical sets) over inputs shaped for them.
 #
 # A failure in either implementation fails both.
 set -euo pipefail
@@ -83,4 +85,26 @@ for seed in ${seeds}; do
   fi
   ok="$(grep -c '^ok ' "${work}/rust.${seed}" || true)"
   echo "crosscheck: seed ${seed} agrees (${count} inputs, ${ok} accepted)" >&2
+done
+
+compose_ops="vector sort-set check-set ndjson ndjson:1 ndjson:3 ndjson-set ndjson-set:2"
+for seed in ${seeds}; do
+  "${python}" -I scripts/crosscheck-gen.py "${seed}" "${count}" compose > "${work}/compose.${seed}"
+  for op in ${compose_ops}; do
+    "${rust_driver}" "${op}" < "${work}/compose.${seed}" > "${work}/rust.${op}.${seed}"
+    "${go_driver}" "${op}" < "${work}/compose.${seed}" > "${work}/go.${op}.${seed}"
+    if ! cmp -s "${work}/rust.${op}.${seed}" "${work}/go.${op}.${seed}"; then
+      echo "crosscheck: drivers differ for ${op}, seed ${seed}; first differing input:" >&2
+      line="$(cmp "${work}/rust.${op}.${seed}" "${work}/go.${op}.${seed}" | awk '{print $NF}')"
+      sed -n "${line}p" "${work}/compose.${seed}" >&2
+      echo "rust: $(sed -n "${line}p" "${work}/rust.${op}.${seed}" | cut -c1-200)" >&2
+      echo "go:   $(sed -n "${line}p" "${work}/go.${op}.${seed}" | cut -c1-200)" >&2
+      exit 1
+    fi
+  done
+  summary=""
+  for op in ${compose_ops}; do
+    summary="${summary} ${op}=$(grep -c '^ok ' "${work}/rust.${op}.${seed}" || true)"
+  done
+  echo "crosscheck: compose seed ${seed} agrees (${count} inputs; accepted:${summary})" >&2
 done

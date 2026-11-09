@@ -7,6 +7,18 @@ scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 export CANONPRIMS_RELEASE_TAG=v1.2.3
 source "$root/scripts/release-common.sh"
+# The command-line archives were named canon through 0.1.4 and canonprims
+# from 0.1.5; published older releases keep their own names.
+cli_assets() { CANONPRIMS_RELEASE_TAG="$1" release_base_assets | grep -E '^canon(prims)?-[0-9]' | grep -v -- '-src\.tar\.gz$' | grep -v -- '-cp310-'; }
+for pair in v0.1.0:canon v0.1.4:canon v0.1.5:canonprims v0.1.10:canonprims v0.2.0:canonprims v1.2.3:canonprims; do
+    tag="${pair%%:*}" want="${pair#*:}" version="${tag#v}"
+    expected="$(for p in linux-amd64.tar.gz linux-arm64.tar.gz darwin-arm64.tar.gz windows-amd64.zip windows-arm64.zip; do printf '%s-%s-%s\n' "$want" "$version" "$p"; done)"
+    if [[ "$(cli_assets "$tag")" != "$expected" ]]; then
+        echo "error: $tag command-line assets are not $want-*" >&2
+        cli_assets "$tag" >&2
+        exit 1
+    fi
+done
 directory="$scratch/assets"
 mkdir "$directory"
 while IFS= read -r name; do printf 'synthetic %s\n' "$name" >"$directory/$name"; done < <(release_signable_assets)
@@ -28,13 +40,13 @@ cp "$directory/SHA512SUMS" "$scratch/good512"
 printf extra >"$directory/.hidden"
 fail "$root/scripts/validate-release-assets.sh" "$directory" checksummed
 rm "$directory/.hidden"
-mv "$directory/canon-1.2.3-windows-arm64.zip" "$scratch/asset"
+mv "$directory/canonprims-1.2.3-windows-arm64.zip" "$scratch/asset"
 fail "$root/scripts/validate-release-assets.sh" "$directory" checksummed
 fail "$root/scripts/verify-checksums.sh" "$directory"
-mv "$scratch/asset" "$directory/canon-1.2.3-windows-arm64.zip"
-cp "$directory/canon-1.2.3-windows-arm64.zip" "$directory/canon-1.2.4-windows-arm64.zip"
+mv "$scratch/asset" "$directory/canonprims-1.2.3-windows-arm64.zip"
+cp "$directory/canonprims-1.2.3-windows-arm64.zip" "$directory/canonprims-1.2.4-windows-arm64.zip"
 fail "$root/scripts/validate-release-assets.sh" "$directory" checksummed
-rm "$directory/canon-1.2.4-windows-arm64.zip"
+rm "$directory/canonprims-1.2.4-windows-arm64.zip"
 printf changed >>"$directory/expected-fingerprints.ndjson"
 fail "$root/scripts/verify-checksums.sh" "$directory"
 printf 'synthetic expected-fingerprints.ndjson\n' >"$directory/expected-fingerprints.ndjson"

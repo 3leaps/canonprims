@@ -74,3 +74,11 @@ fallback.
 Before any release, the Go module moved from `go/canon` to the repository
 root and the release went from two tags (`vX.Y.Z` and `go/canon/vX.Y.Z`) to
 one. No release was made under the two-tag rule.
+
+## Revision (2026-11-09)
+
+From 0.1.5 the command-line binary is `canonprims` and its release archives
+are `canonprims-X.Y.Z-<platform>`; releases 0.1.0 through 0.1.4 keep their
+`canon-X.Y.Z-<platform>` archives, and release staging expects each
+release's own names. The Go package path `github.com/3leaps/canonprims/canon`,
+the tag set and the crate names are unchanged.

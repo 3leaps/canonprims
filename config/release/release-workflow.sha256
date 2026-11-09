@@ -2,4 +2,4 @@
 a2de7f5f070750440005e72f267f62855886431673ccc94e20a4a940440a08cd  .github/workflows/ci.yml
 8e74a4ec2cab94655e66b48865c8b85030f4fb45faab511b77ec75d7cf7278a1  .github/workflows/crates-verify.yml
 f84cfb4e8bc35f741eeba2b574e4d46a80061933275776dd1aef04b1f26766b1  .github/workflows/registry-publish.yml
-7e9a7cf748e61535f66b61b8d9dc163687cf8871ebc6f9eb12d7f77323571708  .github/workflows/release.yml
+cca5d48319885282b47315ad56ea78cc76d224b9d159b6fbdea189a9087de22c  .github/workflows/release.yml

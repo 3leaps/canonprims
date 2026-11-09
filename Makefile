@@ -146,7 +146,7 @@ version-check: ## VERSION matches Cargo.toml and both bindings
 	@test "$(VERSION)" = "$$($(PYTHON) -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' $(TS_BINDING)/package.json)" || { echo "VERSION and $(TS_BINDING)/package.json differ"; exit 1; }
 	@echo "[ok] version-check"
 
-build: ## Release build of the canon CLI
+build: ## Release build of the canonprims CLI
 	$(CARGO) build --release --locked -p canonprims-cli
 
 clean: ## Remove build output

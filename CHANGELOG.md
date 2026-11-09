@@ -7,6 +7,35 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-09
+
+- The command-line binary is renamed from `canon` to `canonprims`; release
+  archives are `canonprims-X.Y.Z-<platform>`. The Go package path
+  `github.com/3leaps/canonprims/canon`, the crate names and the Python and npm
+  package names are unchanged. Release staging still expects `canon-*` archive
+  names for published releases 0.1.0 through 0.1.4
+- `canonprims jcs --vector`: one canonical JSON object holding the canonical
+  bytes as a string, their byte length, their `sha256:` digest and the scheme
+- `canonprims jcs --ndjson-array [--head N]`: canonicalize a strict
+  LF-terminated NDJSON prefix (no CR LF, no blank line, no unterminated line)
+  as one canonical array; only the selected lines are parsed and bounded,
+  and the command does not wait for input after them
+- `canonprims jcs --sort-set`: canonicalize an array as a canonical set,
+  sorted by element canonical bytes with duplicates refused; with `--check`,
+  require the input to be that set already
+- Library helpers behind those modes in `canonprims-json` (`vector`,
+  `Vector`, `ndjson_elements`, `canonicalize_ndjson`, `sort_canonical_set`,
+  `check_canonical_set`, `assemble_canonical_set`) and in Go package `canon`
+  (`VectorOf`, `VectorOfCanonical`, `Vector`, `NDJSONElements`,
+  `CanonicalizeNDJSON`, `SortCanonicalSet`, `CheckCanonicalSet`,
+  `AssembleCanonicalSet`), with refusal codes `not_an_array` and
+  `duplicate_set_element`; Rust and Go agree byte for byte on each in
+  `make crosscheck`
+- Numeric command-line options (`--max-*`, `--head`) accept only ASCII decimal
+  digits; a sign, space or `_` is a usage error
+- Record the `v0.1.4` arm64 runner group and runner image versions in
+  `docs/releases/v0.1.4.md`
+
 ## [0.1.4] - 2026-10-31
 
 - `scripts/release-github-preflight.sh` supports read-only `GITHUB_TOKEN`
@@ -110,7 +139,8 @@ listed here ships in 0.1.1.
 - Public-surface checks: a vocabulary-free content check of tracked files in
   `make check`, and a maintainer-only limensafe scan in `make pr-final`
 
-[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/3leaps/canonprims/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/3leaps/canonprims/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/3leaps/canonprims/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/3leaps/canonprims/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/3leaps/canonprims/compare/v0.1.1...v0.1.2
