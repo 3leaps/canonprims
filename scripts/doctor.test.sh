@@ -56,12 +56,23 @@ reset_stubs() {
 	# check is exercised below through a config pointing at a stub.
 	for tool in $tools_stubbed; do stub "$tool" "$(good "$tool")"; done
 }
+# yamlprims is never looked up on PATH: its detect command (run from the
+# repository root) reads the binary named by CANONPRIMS_YAMLPRIMS_BIN, and only
+# if its SHA-256 is committed in config/yamlprims-cli.txt. A stub can never
+# pass, so the real binary is used (no older release exists to test the
+# minimum with; the comparison itself is the one every tool shares).
+yamlprims_real="${CANONPRIMS_YAMLPRIMS_BIN:-}"
+[[ "$yamlprims_real" == /* && -f "$yamlprims_real" ]] || {
+	echo 'error: the doctor test needs CANONPRIMS_YAMLPRIMS_BIN (absolute path to the yamlprims CLI)' >&2
+	exit 1
+}
+yamlprims_bin="$yamlprims_real"
 doctor() {
 	local scope="$1"
-	env -i PATH="$scratch/stubs:$scratch/py" HOME="$scratch" \
-		python3 -I -B "$root/scripts/doctor.py" "$config" "$patterns" "$scope" >"$scratch/out" 2>&1
+	(cd "$root" && env -i PATH="$scratch/stubs:$scratch/py" HOME="$scratch" CANONPRIMS_YAMLPRIMS_BIN="$yamlprims_bin" \
+		python3 -I -B "$root/scripts/doctor.py" "$config" "$patterns" "$scope") >"$scratch/out" 2>&1
 }
-direct() { env -i PATH="$scratch/stubs:$scratch/py" python3 -I -B "$root/scripts/doctor.py" "$1" "${3:-$patterns}" "$2" >"$scratch/out" 2>&1; }
+direct() { (cd "$root" && env -i PATH="$scratch/stubs:$scratch/py" CANONPRIMS_YAMLPRIMS_BIN="$yamlprims_bin" python3 -I -B "$root/scripts/doctor.py" "$1" "${3:-$patterns}" "$2") >"$scratch/out" 2>&1; }
 passes() {
 	doctor "$1" || { echo "error: refused scope $1" >&2; cat "$scratch/out" >&2; exit 1; }
 	grep -q "^\[ok\] doctor ($1)" "$scratch/out"
@@ -85,7 +96,7 @@ passes release
 passes dev
 # Each tool's version format is parsed to the right number.
 doctor release
-for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11' 'npm 11.19.0' 'uv 0.8.22'; do
+for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11' 'npm 11.19.0' 'uv 0.8.22' 'yamlprims 0.1.0'; do
 	grep -q "^\[ok\] $line (minimum" "$scratch/out" || { echo "error: did not read '$line'" >&2; cat "$scratch/out" >&2; exit 1; }
 done
 doctor dev
@@ -108,6 +119,17 @@ sed 's/detect_command: python3 --version/detect_command: old-python --version/' 
 grep -q 'old-python --version' "$scratch/oldpy.yaml"
 if direct "$scratch/oldpy.yaml" dev; then echo 'error: accepted Python 3.10' >&2; exit 1; fi
 grep -q 'python3 3.10.14 is below the recommended minimum 3.11.0' "$scratch/out"
+
+# The released yamlprims reads as 0.1.0 (it has no version flag: usage on
+# stderr, status 2). Any other binary, even one printing a good version line,
+# and an unset or relative variable, are unreadable.
+reset_stubs
+passes dev
+grep -q '^\[ok\] yamlprims 0.1.0 (minimum' "$scratch/out"
+stub yamlprims-stub 'yamlprims 0.1.0'
+yamlprims_bin="$scratch/stubs/yamlprims-stub" refused dev 'yamlprims: cannot read a version'
+yamlprims_bin='' refused dev 'yamlprims: cannot read a version'
+yamlprims_bin=stubs/yamlprims refused dev 'yamlprims: cannot read a version'
 
 # Unreadable version, failing detect command, missing tool.
 reset_stubs
@@ -154,7 +176,7 @@ grep -q 'needs a version group' "$scratch/out"
 # A scope naming an undeclared tool, a tool without a minimum, and a
 # malformed config are errors, not skips.
 reset_stubs
-sed 's/tools: \[git, jq, python3, go\]/tools: [git, jq, python3, go, rustc]/' "$config" >"$scratch/extra.yaml"
+sed 's/tools: \[git, jq, python3, go, yamlprims\]/tools: [git, jq, python3, go, yamlprims, rustc]/' "$config" >"$scratch/extra.yaml"
 grep -q 'rustc\]' "$scratch/extra.yaml"
 if direct "$scratch/extra.yaml" dev; then echo 'error: accepted an undeclared tool' >&2; exit 1; fi
 grep -q 'rustc: listed in scope dev but not declared' "$scratch/out"

@@ -6,18 +6,25 @@
 # which skips two-part versions such as jq-1.6.
 #
 # The minimums are recommendations: the versions this repository is known to
-# work with, not proven lower bounds. Older versions may work; YMMV. Two are
+# work with, not proven lower bounds. Older versions may work; YMMV. Three are
 # floors for a stated reason: jq 1.6 rejects a jq keyword used as a variable
-# name, and the release scripts require Python 3.11 themselves.
+# name, the release scripts require Python 3.11 themselves, and the yamlprims
+# minimum is the one scripts/yaml_json.py enforces (config/yamlprims-cli.txt).
+#
+# yamlprims is not looked up on PATH: its detect_command (run from the
+# repository root) authenticates the binary named by CANONPRIMS_YAMLPRIMS_BIN
+# against the SHA-256 digests committed in config/yamlprims-cli.txt, then reads
+# the version of that authenticated copy (scripts/yaml_json.py). The contract
+# probe and the minimum are checked by the workflow checkers, not here.
 #
 # Validate with: goneat doctor tools --config .goneat/tools.yaml --validate-config
 scopes:
   release:
     description: Host tools the maintainer release ceremony runs
-    tools: [git, gh, jq, python3, gpg, minisign, npm, uv]
+    tools: [git, gh, jq, python3, gpg, minisign, npm, uv, yamlprims]
   dev:
     description: Host tools for make check
-    tools: [git, jq, python3, go]
+    tools: [git, jq, python3, go, yamlprims]
 tools:
   git:
     name: git
@@ -127,3 +134,15 @@ tools:
       windows: [scoop, winget]
     version_scheme: semver
     minimum_version: 1.21.0
+  yamlprims:
+    name: yamlprims
+    description: YAML reader for the workflow checkers (CANONPRIMS_YAMLPRIMS_BIN; CI and release validation only)
+    kind: system
+    detect_command: python3 -I -B scripts/yaml_json.py version
+    platforms: [darwin, linux, windows]
+    installer_priority:
+      darwin: [manual]
+      linux: [manual]
+      windows: [manual]
+    version_scheme: semver
+    minimum_version: 0.1.0

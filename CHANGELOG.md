@@ -7,6 +7,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Release tooling: the workflow checkers (`scripts/release-workflow-pin.py`,
+  `scripts/release-workflow-permissions.py`) read YAML through the `yamlprims`
+  CLI (`yamlprims dump --plain`, YAML 1.2 Core Schema) instead of PyYAML,
+  which is no longer used. The binary is trusted by its SHA-256, committed
+  per platform in `config/yamlprims-cli.txt`: the file named by
+  `CANONPRIMS_YAMLPRIMS_BIN` (an absolute path, now required by `make check`,
+  the release tooling tests and the release ceremony; no `PATH` lookup) is
+  copied into a private directory and only that copy runs, and only if its
+  digest is committed for the host platform. It must then identify as
+  yamlprims at or above the committed minimum and pass a fixed contract
+  probe. Each read has a deadline on the whole run and a cap on input and
+  output, and a refusal, malformed output or a duplicate key fails closed.
+  CI downloads the pinned v0.1.0 CLI archive for each runner and checks the
+  archive's and the extracted binary's SHA-256
+  (`scripts/ci-install-yamlprims.sh`, `scripts/ci-extract-yamlprims.py`),
+  replacing `scripts/ci-install-pyyaml.sh` and
+  `config/ci-python-requirements.txt`. `make doctor` reports the version of
+  the authenticated binary. The CLI is a CI and release-validation host tool
+  only; no crate, binding, Go module or shipped binary depends on it
+- The structural workflow mutation controls run on the parsed workflow
+  (`check_data`); every mutation must change the workflow and be refused by
+  the policy. A failure of the YAML reader (refusal, exit status, timeout,
+  size, malformed output) is a separate error type and fails the control
+  instead of counting as a rejection
+- A workflow pin failure while verifying a tag now reports only its own cause;
+  it is no longer also reported as a tag signature failure
 - Record the `v0.1.5` arm64 runner group and runner image versions in
   `docs/releases/v0.1.5.md`
 

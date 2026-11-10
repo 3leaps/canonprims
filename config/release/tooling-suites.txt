@@ -28,3 +28,4 @@ surface-scan
 verify-pinned-tag
 verify-signatures
 verify-staged-public
+yaml-json

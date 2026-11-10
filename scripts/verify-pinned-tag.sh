@@ -6,8 +6,9 @@
 # signing subkey of the pinned primary.
 # Usage: verify-pinned-tag.sh [--published] [--staged-prefix PREFIX]
 #   --published  the tagged commit need not be HEAD (post-release checks)
-# Requires CANONPRIMS_RELEASE_TAG; callers resolve the checker
-# (scripts/release-decernor.sh) and export RELEASE_DECERNOR_BIN.
+# Requires CANONPRIMS_RELEASE_TAG and CANONPRIMS_YAMLPRIMS_BIN (the workflow
+# pin's YAML reader); callers resolve the checker (scripts/release-decernor.sh)
+# and export RELEASE_DECERNOR_BIN.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 # shellcheck source=scripts/release-tag-common.sh
@@ -65,9 +66,12 @@ committed() {
 [[ "$(git cat-file blob "$target:go.mod" | sed -n 's/^module[[:space:]]\{1,\}//p' | tr -d '\r')" == "$tag_go_module" ]] ||
 	die "go.mod in the tagged commit must declare module $tag_go_module"
 # Every workflow that can publish matches its reviewed digest, both read from
-# the tagged commit (never the working tree).
-python3 -B -E "$root/scripts/release-workflow-pin.py" verify-commit "$target" >/dev/null ||
-	die 'a publishing workflow in the tagged commit differs from its reviewed digest'
+# the tagged commit (never the working tree). The checker names the cause (a
+# digest, a permission, or the YAML reader) on stderr; nothing is added here.
+# shellcheck source=scripts/release-yamlprims.sh
+source "$root/scripts/release-yamlprims.sh"
+resolve_release_yamlprims || exit 1
+python3 -B -E "$root/scripts/release-workflow-pin.py" verify-commit "$target" >/dev/null || exit 1
 committed docs/security/release-signing-keys.asc "$keyring/keys.asc"
 committed docs/security/canonprims-minisign.pub "$keyring/minisign.pub"
 committed keys/expected-fingerprints.txt "$keyring/anchors.txt"

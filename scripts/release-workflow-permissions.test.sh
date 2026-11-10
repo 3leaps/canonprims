@@ -4,8 +4,10 @@
 # workflow passes, and every listed mutation of it is refused.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
-python3 -c 'import yaml' 2>/dev/null || {
-	echo 'error: the workflow permission test needs PyYAML (python3-yaml)' >&2
+# YAML is read by the yamlprims CLI (scripts/yaml_json.py); the loader's own
+# failure modes are covered by yaml-json.test.sh.
+[[ -n "${CANONPRIMS_YAMLPRIMS_BIN:-}" ]] || {
+	echo 'error: the workflow permission test needs CANONPRIMS_YAMLPRIMS_BIN (absolute path to the yamlprims CLI)' >&2
 	exit 1
 }
 # Every publishing workflow is pinned by digest (release-workflow-pin.py);
@@ -97,11 +99,15 @@ pin_with
 refused 'must trigger on workflow_dispatch only' check
 git -C "$repo" checkout -q -- .
 pin check
-# A yaml.py beside either checker is never imported (a script's own directory
-# is the one path Python adds by itself).
-mkdir "$scratch/shadow"
-cp "$root/scripts/release-workflow-pin.py" "$root/scripts/release-workflow-permissions.py" "$scratch/shadow/"
-printf 'raise SystemExit("shadow yaml imported")\n' >"$scratch/shadow/yaml.py"
+# A module beside either checker is never imported (a script's own directory
+# is the one path Python adds by itself); only the YAML helper is loaded, by
+# its path.
+mkdir -p "$scratch/shadow" "$scratch/config"
+cp "$root/scripts/release-workflow-pin.py" "$root/scripts/release-workflow-permissions.py" "$root/scripts/yaml_json.py" "$scratch/shadow/"
+cp "$root/config/yamlprims-cli.txt" "$scratch/config/"
+for module in yaml json re subprocess tempfile threading hashlib copy; do
+	printf 'raise SystemExit("shadow %s imported")\n' "$module" >"$scratch/shadow/$module.py"
+done
 (cd "$repo" && python3 -B -E "$scratch/shadow/release-workflow-pin.py" check) >"$scratch/out" 2>&1 || true
 if grep -q 'shadow' "$scratch/out"; then
 	echo 'error: a yaml.py beside the pin checker was imported' >&2
@@ -114,6 +120,24 @@ if grep -q 'shadow' "$scratch/out"; then
 	exit 1
 fi
 [[ ! -s "$scratch/out" ]] || { cat "$scratch/out" >&2; exit 1; }
+rm "$scratch/shadow/"{yaml,json,re,subprocess,tempfile,threading,hashlib,copy}.py
+# The mutation guards: an empty case list, or a case that leaves the workflow
+# unchanged, fails the run rather than passing silently.
+perm="$scratch/shadow/release-workflow-permissions.py"
+cp "$root/scripts/release-workflow-permissions.py" "$perm"
+mutation_guard() {
+	local expected="$1"
+	if python3 -B -E "$perm" mutations "$root/.github/workflows/release.yml" >"$scratch/out" 2>&1; then
+		echo "error: mutation guard did not fire: $expected" >&2
+		exit 1
+	fi
+	grep -q "$expected" "$scratch/out" || { cat "$scratch/out" >&2; exit 1; }
+	cp "$root/scripts/release-workflow-permissions.py" "$perm"
+}
+sed_in_place 's/            cases = mutations(text)$/            cases = []/' "$perm"
+mutation_guard 'no mutation cases'
+sed_in_place 's/        text.replace("decernor-ci-sha256.txt", "x.txt"),$/        text.replace("no-such-anchor", "x.txt"),/' "$perm"
+mutation_guard 'does not change the workflow'
 # The ceremony reads the tagged commit, not the working tree: an uncommitted
 # fix does not rescue a bad commit, and an uncommitted edit does not break a
 # good one.

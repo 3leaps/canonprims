@@ -122,7 +122,10 @@ deny: ## cargo-deny: licenses, bans, sources, advisories
 	$(CARGO) deny --manifest-path $(PY_BINDING)/Cargo.toml --locked check
 	$(CARGO) deny --manifest-path $(TS_BINDING)/Cargo.toml --locked check
 
-workflow-pin: ## Every workflow matches its reviewed digest and is read-only
+# The workflow checkers read YAML only through the yamlprims CLI named by
+# CANONPRIMS_YAMLPRIMS_BIN (absolute path; no PATH lookup, here or in CI and
+# the release ceremony). See config/yamlprims-cli.txt.
+workflow-pin: ## Every workflow matches its reviewed digest and is read-only (needs CANONPRIMS_YAMLPRIMS_BIN)
 	$(PYTHON) -B -E scripts/release-workflow-pin.py check
 
 jq-portability: ## jq variables are valid in jq 1.6 and 1.7
@@ -165,6 +168,7 @@ clean: ## Remove build output
 #   CANONPRIMS_RELEASE_TAG             vX.Y.Z
 #   CANONPRIMS_TAG_MESSAGE_DIR         per-release message directory ending in the tag
 #   CANONPRIMS_DECERNOR_BIN            absolute path to decernor >= 0.1.8 (no fallback)
+#   CANONPRIMS_YAMLPRIMS_BIN           absolute path to the yamlprims CLI (no fallback)
 #   CANONPRIMS_TAGGER_NAME/EMAIL       the committed tagger identity
 #   CANONPRIMS_PGP_KEY_ID              the committed signing subkey followed by !
 #   CANONPRIMS_GPG_HOMEDIR             external GPG home
@@ -202,6 +206,7 @@ release-github-preflight: ## Verify GitHub OIDC environments, Tag Publish Protec
 
 release-preflight: ## Pre-tag gate on a clean main synced with origin
 	@source scripts/release-decernor.sh && resolve_release_decernor && echo "[ok] checker $$RELEASE_DECERNOR_BIN"
+	@source scripts/release-yamlprims.sh && resolve_release_yamlprims && echo "[ok] YAML reader $$RELEASE_YAMLPRIMS_BIN"
 	@test -z "$$(git status --porcelain)" || { echo "error: working tree not clean"; git status --short; exit 1; }
 	@# The gate builds and tests the tree; no registry credential may be readable by that code.
 	@for f in "$${CARGO_HOME:-$$HOME/.cargo}/credentials.toml" "$${CARGO_HOME:-$$HOME/.cargo}/credentials"; do \
