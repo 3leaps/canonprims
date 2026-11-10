@@ -29,9 +29,10 @@ git -C "$src" config user.name '3 Leaps Infosec Team'
 git -C "$src" config user.email infosec@3leaps.net
 mkdir -p "$src/scripts" "$src/docs/security" "$src/keys" "$src/config/release"
 verifier=(verify-pinned-tag.sh validate-release-anchors.sh release-verify-published-tag.sh release-tag-common.sh release-gh.sh release-workflow-pin.py
-    release-decernor.sh release-insert-anchors.sh install-release-anchors.sh)
+    yaml_json.py release-yamlprims.sh release-decernor.sh release-insert-anchors.sh install-release-anchors.sh)
 for script in ${verifier[@]+"${verifier[@]}"}; do cp "$root/scripts/$script" "$src/scripts/"; done
 cp "$root/config/release/tagger-identity.txt" "$src/config/release/"
+cp "$root/config/yamlprims-cli.txt" "$src/config/"
 printf '1.2.3\n' >"$src/VERSION"
 printf 'module github.com/3leaps/canonprims\n' >"$src/go.mod"
 mkdir -p "$src/.github/workflows"
@@ -134,7 +135,7 @@ signed_local="$(git -C "$op" rev-parse refs/tags/v1.2.3)"
 GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net \
     git -C "$src" tag -fa -m 'Replacement' v1.2.3 "$commit"
 git -C "$src" push -q --force origin refs/tags/v1.2.3
-expect_fail 'does not verify against the pin'
+expect_fail 'signature is invalid under the pin'
 [[ "$(git -C "$op" rev-parse refs/tags/v1.2.3)" == "$signed_local" ]] || {
     echo 'error: a failed verification replaced the local tag' >&2
     exit 1
@@ -143,6 +144,33 @@ if [[ -n "$(git -C "$op" for-each-ref refs/canonprims-verify/)" ]]; then
     echo 'error: verification staging refs left behind' >&2
     exit 1
 fi
+
+# A workflow pin failure in a correctly signed target reports that cause
+# only: never a signature failure.
+not_signature() {
+    if grep -qi 'signature' "$scratch/out"; then
+        echo 'error: a workflow pin failure was reported as a signature failure' >&2
+        cat "$scratch/out" >&2
+        exit 1
+    fi
+}
+printf '# unreviewed\n' >>"$src/.github/workflows/release.yml"
+git -C "$src" commit -qam 'unreviewed workflow'
+sign_tag 'Fixture release'
+git -C "$src" push -q origin main
+git -C "$src" push -q --force origin refs/tags/v1.2.3
+expect_fail 'release.yml differs from its reviewed digest'
+not_signature
+git -C "$src" reset -q --hard "$commit"
+sign_tag 'Fixture release'
+git -C "$src" push -q --force origin main refs/tags/v1.2.3
+gate >/dev/null
+# The same holds when the workflow pin cannot read YAML.
+(
+    unset CANONPRIMS_YAMLPRIMS_BIN
+    expect_fail 'CANONPRIMS_YAMLPRIMS_BIN is required'
+    not_signature
+)
 
 # Lightweight replacement: must fail.
 git -C "$scratch/remote.git" update-ref refs/tags/v1.2.3 "$commit"
@@ -200,7 +228,7 @@ GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net
     git -C "$src" tag -fa -m 'Unsigned replacement' v1.2.3
 git -C "$src" push -q origin main
 git -C "$src" push -q --force origin refs/tags/v1.2.3
-expect_fail 'does not verify against the pin'
+expect_fail 'signature is invalid under the pin'
 [[ ! -e "$marker" ]] || {
     echo 'error: code from the unverified tag target was executed' >&2
     exit 1

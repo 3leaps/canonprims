@@ -41,7 +41,7 @@ jobs:
       - name: Install the pinned checker
         run: |
           set -euo pipefail
-          scripts/ci-install-pyyaml.sh python3 --user
+          scripts/ci-install-yamlprims.sh python3
           tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
           name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"
           version="${name#decernor_}"

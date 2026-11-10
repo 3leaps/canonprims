@@ -16,6 +16,10 @@ maintainer's machine. CI holds no signing, release or registry authority.
   against the recommended minimum in `.goneat/tools.yaml` and fails on any tool
   that is missing, older, or whose version it cannot read.
 - decernor 0.1.8 or newer as a regular file at an absolute path
+- the `yamlprims` CLI from a release archive pinned in
+  `config/yamlprims-cli.txt`, at an absolute path: the workflow pin checks
+  read YAML only through it, and only if its SHA-256 is the committed binary
+  digest for the host platform (the path itself is not trusted)
 - limensafe and the maintainer's catalog, which the pre-tag gate requires for
   the public-surface scan (it never runs in CI)
 - The ceremony environment (outside this repository):
@@ -24,6 +28,7 @@ maintainer's machine. CI holds no signing, release or registry authority.
   export CANONPRIMS_RELEASE_TAG="vX.Y.Z"                  # explicit; never derived
   export CANONPRIMS_TAG_MESSAGE_DIR="/path/outside/the/repository/$CANONPRIMS_RELEASE_TAG"
   export CANONPRIMS_DECERNOR_BIN=/absolute/path/to/decernor
+  export CANONPRIMS_YAMLPRIMS_BIN=/absolute/path/to/yamlprims
   export CANONPRIMS_TAGGER_NAME='3 Leaps Infosec Team'    # config/release/tagger-identity.txt
   export CANONPRIMS_TAGGER_EMAIL=infosec@3leaps.net
   export CANONPRIMS_PGP_KEY_ID='<signing subkey>!'        # config/release/signing-subkey.txt

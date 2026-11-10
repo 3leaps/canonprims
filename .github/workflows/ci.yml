@@ -428,11 +428,11 @@ jobs:
           tar -xzf "$tool_dir/$name" -C "$tool_dir" decernor
           echo "CANONPRIMS_DECERNOR_BIN=$tool_dir/decernor" >> "$GITHUB_ENV"
 
-      - name: Install minisign and PyYAML
+      - name: Install minisign and the pinned yamlprims CLI
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq minisign
-          scripts/ci-install-pyyaml.sh python3 --user
+          scripts/ci-install-yamlprims.sh python3
           minisign -v
 
       - name: Release tooling controls

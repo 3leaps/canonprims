@@ -74,7 +74,11 @@ git -C "$repo" tag -d ${tags[@]+"${tags[@]}"} >/dev/null
 printf '# unreviewed\n' >>"$repo/.github/workflows/release.yml"
 fixture_commit "$repo" unreviewed-workflow
 for tag in ${tags[@]+"${tags[@]}"}; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done
-expect_fail_with 'publishing workflow in the tagged commit differs' verify
+# The checker's own cause is reported, and nothing else is claimed.
+expect_fail_with 'release.yml differs from its reviewed digest' verify
+! grep -qi 'signature' "$fixture_dir/last.out" || { cat "$fixture_dir/last.out" >&2; exit 1; }
+CANONPRIMS_YAMLPRIMS_BIN= expect_fail_with 'CANONPRIMS_YAMLPRIMS_BIN is required' verify
+! grep -qi 'signature\|reviewed digest' "$fixture_dir/last.out" || { cat "$fixture_dir/last.out" >&2; exit 1; }
 git -C "$repo" tag -d ${tags[@]+"${tags[@]}"} >/dev/null
 git -C "$repo" reset -q --hard HEAD~1
 for tag in ${tags[@]+"${tags[@]}"}; do sign "$fixture_dir/gpg" "$subkey" "$tag"; done

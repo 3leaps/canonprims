@@ -63,9 +63,9 @@ runs:
         dest="$(scripts/ci-install-tools.sh "${TARGET}" "${tmp}/ci-tools")"
         (cygpath -w "${dest}" 2>/dev/null || echo "${dest}") >> "${GITHUB_PATH}"
 
-    - name: Install pinned Python packages
+    - name: Install the pinned yamlprims CLI
       shell: bash
-      run: scripts/ci-install-pyyaml.sh python
+      run: scripts/ci-install-yamlprims.sh python
 
     - name: Ensure make
       shell: bash

@@ -151,6 +151,18 @@ Requirements:
 - Python 3.
 - Node.js and network access to GitHub, for the independent corpus witnesses.
 - `cargo-deny`.
+- The `yamlprims` CLI from a [3leaps/yamlprims](https://github.com/3leaps/yamlprims)
+  release archive pinned in `config/yamlprims-cli.txt`, named by
+  `CANONPRIMS_YAMLPRIMS_BIN` as an absolute path (never looked up on `PATH`).
+  `make check` and the release tooling read the workflow YAML through it. The
+  trust anchor is the binary's SHA-256 committed in that file, not the path:
+  the file is copied, and the copy runs only if its digest is the committed
+  one for the host platform. It is a host tool for these checks only; nothing
+  built or shipped from this repository depends on it.
+
+  ```bash
+  export CANONPRIMS_YAMLPRIMS_BIN=/absolute/path/to/yamlprims
+  ```
 - For `make python-check`: Python 3.10 or later with `venv` and `pip`;
   it installs the hash-pinned build backend in
   `config/python-build-requirements.txt` into a throwaway environment.
@@ -160,7 +172,7 @@ Requirements:
 
 `.goneat/tools.yaml` declares a recommended minimum version for each host tool
 the checks and the release ceremony run (git, gh, jq, Python, gpg, minisign,
-Go), and `make doctor` reports each one against it (`DOCTOR_SCOPE=dev` for the
+Go, yamlprims), and `make doctor` reports each one against it (`DOCTOR_SCOPE=dev` for the
 development set). It fails when a tool is missing, older, or prints a version
 it cannot read; `config/doctor-versions.txt` says how each tool's version is
 read. The minimums are the versions this repository is known to

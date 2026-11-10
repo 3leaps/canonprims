@@ -16,18 +16,24 @@ Usage:
   release-workflow-pin.py verify-commit COMMIT  git blobs at COMMIT (ceremony)
 """
 
-import hashlib
-import re
-import subprocess
+import os
 import sys
 
-# Import PyYAML from the installed environment only: never from this script's
-# directory or the working directory (a yaml.py there would be the parser).
-import os  # noqa: E402
-
-_untrusted = {os.path.realpath(p) for p in (os.path.dirname(os.path.abspath(__file__)), os.getcwd())}
+# Import the standard library only: never a module from this script's
+# directory or the working directory. YAML is read by the yamlprims CLI through
+# scripts/yaml_json.py, loaded by its path (CANONPRIMS_YAMLPRIMS_BIN).
+_here = os.path.dirname(os.path.abspath(__file__))
+_untrusted = {os.path.realpath(p) for p in (_here, os.getcwd())}
 sys.path[:] = [p for p in sys.path if p not in ("", ".") and os.path.realpath(p) not in _untrusted]
-import yaml  # noqa: E402
+sys.dont_write_bytecode = True
+import hashlib  # noqa: E402
+import importlib.util  # noqa: E402
+import re  # noqa: E402
+import subprocess  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("canonprims_yaml_json", os.path.join(_here, "yaml_json.py"))
+yaml_json = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(yaml_json)
 
 PIN = "config/release/release-workflow.sha256"
 WORKFLOWS = ".github/workflows/"
@@ -40,14 +46,14 @@ def fail(reason):
     raise ValueError(reason)
 
 
-def read_only(path, text):
+def read_only(path, data):
     """Top-level contents: read, and no job grants anything wider (except the
     two environment-gated OIDC publish jobs in registry-publish.yml)."""
-    data = yaml.safe_load(text)
+    data = yaml_json.load(data, path)
     if not isinstance(data, dict) or data.get("permissions") != {"contents": "read"}:
         fail(f"{path} must declare top-level permissions: contents: read")
     if path == OIDC_WORKFLOW:
-        trigger = data.get("on") if "on" in data else data.get(True)
+        trigger = data.get("on")
         if not isinstance(trigger, dict) or set(trigger) != {"workflow_dispatch"}:
             fail(f"{path} must trigger on workflow_dispatch only")
     for name, job in (data.get("jobs") or {}).items():
@@ -91,7 +97,7 @@ def verify(files, pin_text):
         if hashlib.sha256(data).hexdigest() != pins[path]:
             fail(f"{path} differs from its reviewed digest in {PIN}")
         if path.startswith(WORKFLOWS):
-            read_only(path, data.decode("utf-8"))
+            read_only(path, data)
     for path in pins:
         if path not in files:
             fail(f"pinned workflow {path} is missing")
@@ -122,6 +128,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, OSError, yaml.YAMLError, subprocess.CalledProcessError, UnicodeDecodeError) as error:
-        detail = str(error) if isinstance(error, ValueError) else "unreadable workflow or pin"
+    except (ValueError, yaml_json.ReaderError, OSError, subprocess.CalledProcessError, UnicodeDecodeError) as error:
+        detail = str(error) if isinstance(error, (ValueError, yaml_json.ReaderError)) else "unreadable workflow or pin"
         sys.exit("error: " + detail)

@@ -64,12 +64,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Install minisign, PyYAML, and the pinned checker
+      - name: Install minisign, the pinned yamlprims CLI, and the pinned checker
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq minisign
-          scripts/ci-install-pyyaml.sh python3 --user
+          scripts/ci-install-yamlprims.sh python3
           minisign -v
           tool_dir="$(mktemp -d "$RUNNER_TEMP/decernor.XXXXXX")"
           name="$(awk '{print $2}' config/release/decernor-ci-sha256.txt)"

@@ -58,8 +58,10 @@ commit="$(git rev-parse "$staging$tag^{}")"
 pinned="$(git cat-file blob "$commit:keys/expected-fingerprints.txt" 2>/dev/null | awk '$1=="gpg" {print $2}')" ||
     die 'tagged commit has no fingerprint anchors'
 [[ "$pinned" == "$approved" ]] || die 'pin in the tagged commit is not the approved primary'
+# verify-pinned-tag.sh names its own cause (signature, pin, anchors or the
+# workflow pin) on stderr; no other cause is claimed here.
 CANONPRIMS_RELEASE_TAG="$tag" "$root/scripts/verify-pinned-tag.sh" --published --staged-prefix "$staging" >/dev/null ||
-    die 'published tag signature does not verify against the pin committed in its commit'
+    exit 1
 tag_json="$(release_gh api "repos/3leaps/canonprims/git/tags/$remote_object")" || die "GitHub tag object for $tag unavailable"
 jq -e --arg tag "$tag" --arg commit "$commit" \
     '.tag == $tag and .object.type == "commit" and .object.sha == $commit and .verification.verified == true and .verification.reason == "valid"' \

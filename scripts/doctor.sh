@@ -16,4 +16,6 @@ case "$scope" in release | dev) ;; *)
 	exit 2
 	;;
 esac
+# Detect commands that name a repository script run from the root.
+cd "$root"
 exec python3 -I -B "$root/scripts/doctor.py" "$root/.goneat/tools.yaml" "$root/config/doctor-versions.txt" "$scope"
