@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Record the `v0.1.5` arm64 runner group and runner image versions in
+  `docs/releases/v0.1.5.md`
+
 ## [0.1.5] - 2026-11-09
 
 - The command-line binary is renamed from `canon` to `canonprims`; release
