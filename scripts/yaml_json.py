@@ -61,8 +61,9 @@ TIMEOUT = 30
 # (macOS scans new code before it starts), which a loaded host can stretch
 # past TIMEOUT. Later runs of the same copy get TIMEOUT.
 FIRST_RUN_TIMEOUT = 120
-# The first release has no version flag: `--version` prints the usage text and
-# exits 2. No earlier release exists, so such a binary is 0.1.0.
+# Releases through 0.1.1 have no version flag: `--version` prints the usage
+# text and exits 2. Such a binary is read as 0.1.0, the oldest release; which
+# release it is comes from its committed digest, not from this probe.
 FIRST_RELEASE = (0, 1, 0)
 USAGE = b"usage: yamlprims "
 PROBE_IN = b'on: push\ny: yes\nz: [1, -2, 2.5, true, null, "x\\u00e9"]\na: {q: 1, b: 2}\n'
