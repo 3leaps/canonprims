@@ -26,7 +26,12 @@ found="$(for file in ${suites[@]+"${suites[@]}"}; do basename "$file" .test.sh; 
 }
 for suite in ${suites[@]+"${suites[@]}"}; do
 	echo "== $(basename "$suite" .test.sh)"
-	"$suite"
+	status=0
+	"$suite" || status=$?
+	[[ "$status" -eq 0 ]] || {
+		echo "error: release tooling suite $(basename "$suite" .test.sh) failed (exit $status)" >&2
+		exit 1
+	}
 done
 stray="$(find "$root/scripts" -name __pycache__ -o -name '*.pyc')"
 [[ -z "$stray" ]] || {

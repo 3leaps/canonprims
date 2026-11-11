@@ -476,6 +476,7 @@ ALLOWED_STEP_ENV_ITEMS = frozenset(
 
 def shell_code(run):
     text = str(run)
+    # Backstop: check_data's whole-workflow scan refuses these first.
     if has_forbidden_control_char(text):
         fail("non-LF control or line-separator character in run step")
     if "${{" in text:
@@ -504,6 +505,7 @@ def stripped_run_lines(run):
 
 
 def canonical_step(step, job_name):
+    # Backstop: check_data refuses a non-mapping step first ("malformed step").
     if not isinstance(step, dict):
         fail(f"{job_name}: step is not a mapping")
     if not set(step).issubset({"name", "id", "uses", "with", "env", "run", "shell"}):
@@ -549,6 +551,7 @@ def check_data(data, profile):
         fail("workflow has unreviewed top-level keys")
     if data.get("permissions") != {"contents": "read"}:
         fail("workflow permissions must be exactly contents: read")
+    # Backstop: the top-level key set above refuses defaults first.
     if "defaults" in data:
         fail("workflow-level defaults are not reviewed")
     if data.get("env") != profile["workflow_env"]:
@@ -686,6 +689,9 @@ def check_data(data, profile):
     actual_verify_steps = [canonical_step(s, "verify") for s in (jobs["verify"].get("steps") or [])]
     if actual_verify_steps != profile["verify_steps"]:
         fail("verify: verification steps differ from reviewed profile")
+    # Backstops: the exact verify-step comparison above refuses any change
+    # these rules can see, while the reviewed profiles carry the commands,
+    # the boundary and the registry-stage upload.
     code = "\n".join(shell_code(s.get("run", "")) for s in jobs["verify"].get("steps") or [] if isinstance(s, dict))
     for command in MANDATORY:
         if not re.search(r"(?m)^\s*" + re.escape(command), code):
@@ -993,6 +999,62 @@ def mutations(text):
     ]
 
 
+def rule_mutations(parsed, name):
+    """One structural mutation per policy rule, each bound to that rule's
+    reason, so that removing a rule fails a control even when a later rule
+    (such as the exact verify-step comparison) would still refuse the
+    workflow. Rules that cannot fire while an earlier rule guards the same
+    input have no control here; they are marked where they are defined."""
+    cases = []
+
+    def case(reason, edit):
+        doc = copy.deepcopy(parsed)
+        edit(doc)
+        cases.append((doc, reason))
+
+    def steps(doc):
+        return doc["jobs"]["verify"]["steps"]
+
+    def append_run(doc, lines):
+        step = steps(doc)[1]
+        step["run"] = step["run"].rstrip("\n") + "\n" + lines
+
+    cases.append(([], "workflow is not a mapping"))
+    case("workflow has unreviewed top-level keys", lambda doc: doc.update({"concurrency": "release"}))
+    case("workflow has unreviewed top-level keys", lambda doc: doc.pop("on"))
+    case("workflow jobs are missing", lambda doc: doc.update({"jobs": {}}))
+    if PROFILES[name].get("oidc"):
+        case("OIDC workflow job set differs from reviewed profile",
+             lambda doc: doc["jobs"].update({"publish-extra": copy.deepcopy(doc["jobs"]["publish-npm"])}))
+    case("non-LF control or line-separator character in workflow", lambda doc: steps(doc)[0].update({"name": "Checkout\x0b"}))
+    case("workflow registry or secret access", lambda doc: steps(doc)[0].update({"name": "read secrets.TOKEN"}))
+    case("job is not a mapping", lambda doc: doc["jobs"].update({list(doc["jobs"])[-1]: "verify"}))
+    others = [job for job in parsed["jobs"] if job != "verify" and job not in (PROFILES[name].get("oidc") or {})]
+    if others:
+        case("job outputs are not reviewed", lambda doc: doc["jobs"][others[0]].update({"outputs": {"a": "b"}}))
+    case("comment line ending with backslash is not reviewed", lambda doc: append_run(doc, "# note \\\necho ok\n"))
+    case("comment line after backslash line continuation is not reviewed", lambda doc: append_run(doc, "echo a \\\n# note\necho b\n"))
+    case("unreviewed step key", lambda doc: steps(doc)[0].update({"timeout-minutes": 5}))
+    case("step must specify either uses or run", lambda doc: steps(doc)[0].update({"run": "true"}))
+    case("step must specify either uses or run", lambda doc: steps(doc).append({"name": "empty"}))
+    case("uses step must not specify shell", lambda doc: steps(doc)[0].update({"shell": "bash"}))
+    case("run step must not specify with", lambda doc: steps(doc)[1].update({"with": {"a": "b"}}))
+    case("malformed step", lambda doc: steps(doc).append("echo"))
+    case("step conditions, continue-on-error and working-directory are not reviewed", lambda doc: steps(doc)[0].update({"if": "always()"}))
+    case("step id differs from reviewed profile", lambda doc: steps(doc)[0].update({"id": "checkout"}))
+    case("unreviewed step env mapping", lambda doc: steps(doc)[1].update({"env": {"FOO": "bar"}}))
+    case("ignored failures and heredocs are not reviewed", lambda doc: append_run(doc, "false || true\n"))
+    case("uses step must not specify env", lambda doc: steps(doc)[0].update({"env": {"GH_TOKEN": "${{ github.token }}"}}))
+    case("unreviewed release action", lambda doc: steps(doc).append({"uses": "actions/upload-artifact@v4"}))
+    case("unreviewed release action", lambda doc: steps(doc).append({"uses": "example/action@" + "0" * 40}))
+    case("checkout step must be first with reviewed with mapping",
+         lambda doc: steps(doc)[0]["with"].update({"persist-credentials": True}))
+    case("workflow release creation or publication", lambda doc: append_run(doc, "gh release create v1\n"))
+    case("a container may start only from the reviewed wheel-build step", lambda doc: steps(doc)[0].update({"name": "docker run x"}))
+    case("job must have exactly one checkout step", lambda doc: steps(doc).__setitem__(0, {"name": "Checkout", "run": "true"}))
+    return cases
+
+
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in ("check", "mutations"):
         fail("usage: release-workflow-permissions.py check|mutations FILE")
@@ -1011,19 +1073,23 @@ def main():
         else:
             cases = registry_publish_mutations(text, parsed)
         run_mutations(cases, text, parsed, profile)
-        print(f"[ok] {name}: {len(cases)} mutations refused")
+        rules = rule_mutations(parsed, name)
+        run_mutations(rules, text, parsed, profile)
+        print(f"[ok] {name}: {len(cases)} mutations and {len(rules)} rule controls refused")
 
 
 def run_mutations(cases, text, parsed, profile):
-    """Each case is mutated workflow text (read through yamlprims) or a
-    mutated parsed workflow (a dict). Every case must differ from the
-    original and be refused by the policy (a ValueError from check_data).
-    Any failure of the YAML reader (refusal, exit status, timeout, size,
-    malformed output) is a ReaderError, not a ValueError, and fails the
-    control: it says nothing about the policy."""
+    """Each case is mutated workflow text (read through yamlprims), a
+    mutated parsed workflow (a dict), or a (mutated, reason) pair whose
+    refusal must name that reason. Every case must differ from the original
+    and be refused by the policy (a ValueError from check_data). Any failure
+    of the YAML reader (refusal, exit status, timeout, size, malformed
+    output) is a ReaderError, not a ValueError, and fails the control: it
+    says nothing about the policy."""
     if not cases:
         fail("no mutation cases")
-    for index, mutated in enumerate(cases):
+    for index, case in enumerate(cases):
+        mutated, reason = case if isinstance(case, tuple) else (case, None)
         if mutated == (text if isinstance(mutated, str) else parsed):
             fail(f"mutation {index} does not change the workflow")
         try:
@@ -1033,7 +1099,9 @@ def run_mutations(cases, text, parsed, profile):
                 check_data(mutated, profile)
         except yaml_json.ReaderError as error:
             fail(f"mutation {index} failed in the YAML reader, not the policy: {error}")
-        except ValueError:
+        except ValueError as error:
+            if reason is not None and reason not in str(error):
+                fail(f"mutation {index} was refused by another rule: want {reason!r}, got {str(error)!r}")
             continue
         fail(f"mutation {index} was accepted")
 

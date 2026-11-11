@@ -223,6 +223,15 @@ try:
     raise SystemExit("error: a descendant of the timed-out reader is still running")
 except ProcessLookupError:
     pass
+# The first run of a copy (the version probe) has its own budget, so a slow
+# first start is not a reader failure; it is still bounded.
+slow_start = stub("slowstart", f'sleep 2\nexec "{real}" "$@"')
+ym.FIRST_RUN_TIMEOUT = 5
+if ym.read_version(slow_start) < (0, 1, 0):
+    raise SystemExit("error: a slow first run did not report a version")
+ym.FIRST_RUN_TIMEOUT = 1
+expect("yamlprims did not finish within 1 seconds", lambda: ym.read_version(slow_start))
+ym.FIRST_RUN_TIMEOUT = 120
 ym.TIMEOUT = 30
 
 # Compatibility checks after a digest match (the copy is a stub here): another
