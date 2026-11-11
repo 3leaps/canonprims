@@ -19,7 +19,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   yamlprims at or above the committed minimum and pass a fixed contract
   probe. Each read has a deadline on the whole run and a cap on input and
   output, and a refusal, malformed output or a duplicate key fails closed.
-  CI downloads the pinned v0.1.0 CLI archive for each runner and checks the
+  CI downloads the pinned v0.1.1 CLI archive for each runner and checks the
   archive's and the extracted binary's SHA-256
   (`scripts/ci-install-yamlprims.sh`, `scripts/ci-extract-yamlprims.py`),
   replacing `scripts/ci-install-pyyaml.sh` and
@@ -33,6 +33,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   instead of counting as a rejection
 - A workflow pin failure while verifying a tag now reports only its own cause;
   it is no longer also reported as a tag signature failure
+- The YAML reader gives the first run of each private copy of the CLI (its
+  version probe) its own 120-second deadline, so a slow first start is not a
+  reader timeout; every later run keeps the 30-second deadline
 - Record the `v0.1.5` arm64 runner group and runner image versions in
   `docs/releases/v0.1.5.md`
 
