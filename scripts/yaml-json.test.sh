@@ -223,6 +223,15 @@ try:
     raise SystemExit("error: a descendant of the timed-out reader is still running")
 except ProcessLookupError:
     pass
+# The first run of a copy (the version probe) has its own budget, so a slow
+# first start is not a reader failure; it is still bounded.
+slow_start = stub("slowstart", f'sleep 2\nexec "{real}" "$@"')
+ym.FIRST_RUN_TIMEOUT = 5
+if ym.read_version(slow_start) < (0, 1, 0):
+    raise SystemExit("error: a slow first run did not report a version")
+ym.FIRST_RUN_TIMEOUT = 1
+expect("yamlprims did not finish within 1 seconds", lambda: ym.read_version(slow_start))
+ym.FIRST_RUN_TIMEOUT = 120
 ym.TIMEOUT = 30
 
 # Compatibility checks after a digest match (the copy is a stub here): another
@@ -247,6 +256,13 @@ expect("does not produce the yamlprims plain JSON contract", resolved_with(stub(
     "drift", f'[[ "$1" == --version ]] && exec "{real}" "$@"\ncat >/dev/null\nprintf "{{\\"on\\":\\"push\\"}}\\n"')))
 expect("does not refuse a duplicate key", resolved_with(stub(
     "lenient", f'[[ "$1" == --version ]] && exec "{real}" "$@"\nin="$(cat)"\n[[ "$in" == "a: 1"* ]] && {{ echo "{{\\"a\\":2}}"; exit 0; }}\nexec "{real}" "$@" <<<"$in"')))
+# Only the version probe gets the first-run budget: resolve's contract
+# probes, which follow it, keep TIMEOUT.
+ym.TIMEOUT = 1
+for name, first in (("slowprobe", "on:"), ("slowdup", "a: 1")):
+    expect("yamlprims did not finish within 1 seconds", resolved_with(stub(
+        name, f'[[ "$1" == --version ]] && exec "{real}" "$@"\nin="$(cat)"\n[[ "$in" == "{first}"* ]] && sleep 2\nexec "{real}" "$@" <<<"$in"')))
+ym.TIMEOUT = 30
 
 # Check and use are one copy: only a private 0700 copy is run, so replacing
 # the source after it was authenticated changes nothing.

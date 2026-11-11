@@ -56,6 +56,11 @@ MAX_INPUT = 4 * 1024 * 1024
 # its output. Tests lower it by assignment; it is not read from the
 # environment.
 TIMEOUT = 30
+# Seconds for the first run of each private copy (the version probe). A
+# freshly written executable can be assessed by the OS on its first run
+# (macOS scans new code before it starts), which a loaded host can stretch
+# past TIMEOUT. Later runs of the same copy get TIMEOUT.
+FIRST_RUN_TIMEOUT = 120
 # The first release has no version flag: `--version` prints the usage text and
 # exits 2. No earlier release exists, so such a binary is 0.1.0.
 FIRST_RELEASE = (0, 1, 0)
@@ -125,13 +130,15 @@ def _kill(proc):
         pass
 
 
-def run(binary, args, data):
+def run(binary, args, data, timeout=None):
     """Run binary with args and data on stdin; return (status, stdout, stderr
-    head). The whole run, including reading stdout, ends at TIMEOUT seconds
-    whatever holds the pipe open; stdout above MAX_OUTPUT fails."""
+    head). The whole run, including reading stdout, ends at timeout seconds
+    (TIMEOUT by default) whatever holds the pipe open; stdout above
+    MAX_OUTPUT fails."""
+    limit = TIMEOUT if timeout is None else timeout
     if len(data) > MAX_INPUT:
         fail(f"YAML input is larger than {MAX_INPUT} bytes")
-    deadline = time.monotonic() + TIMEOUT
+    deadline = time.monotonic() + limit
     with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stderr:
         stdin.write(data)
         stdin.seek(0)
@@ -169,7 +176,7 @@ def run(binary, args, data):
         reader.join(max(0.0, deadline - time.monotonic()))
         if reader.is_alive():
             _kill(proc)
-            fail(f"yamlprims did not finish within {TIMEOUT} seconds")
+            fail(f"yamlprims did not finish within {limit} seconds")
         if state["over"]:
             _kill(proc)
             fail(f"yamlprims output is larger than {MAX_OUTPUT} bytes")
@@ -177,7 +184,7 @@ def run(binary, args, data):
             status = proc.wait(timeout=max(0.0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             _kill(proc)
-            fail(f"yamlprims did not finish within {TIMEOUT} seconds")
+            fail(f"yamlprims did not finish within {limit} seconds")
         stderr.seek(0)
         err = stderr.read(2048).decode("utf-8", "replace").strip().splitlines()
     return status, b"".join(chunks), (err[0] if err else "")
@@ -237,7 +244,7 @@ def authenticate(source):
 def read_version(binary):
     """The version the binary reports, as a tuple; it must identify as
     yamlprims."""
-    status, out, err = run(binary, ["--version"], b"")
+    status, out, err = run(binary, ["--version"], b"", FIRST_RUN_TIMEOUT)
     match = re.fullmatch(rb"yamlprims ([0-9]+)\.([0-9]+)\.([0-9]+)\n", out) if status == 0 else None
     if match:
         return tuple(int(part) for part in match.groups())

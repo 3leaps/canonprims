@@ -93,6 +93,14 @@ export CANONPRIMS_GPG_SIGNING_FINGERPRINT="$primary"
 # The operator's trusted checkout carries the current verifier and helpers.
 for script in ${verifier[@]+"${verifier[@]}"}; do cp "$root/scripts/$script" "$op/scripts/"; done
 gate() { (cd "$op" && ./scripts/release-verify-published-tag.sh); }
+# A gate that must pass keeps its output, and prints it if it fails.
+pass_gate() {
+    gate >"$scratch/out" 2>&1 || {
+        echo 'error: the published-tag gate refused a valid release:' >&2
+        cat "$scratch/out" >&2
+        exit 1
+    }
+}
 expect_fail() {
     if gate >"$scratch/out" 2>&1; then
         echo "error: expected rejection: $1" >&2
@@ -104,7 +112,7 @@ expect_fail() {
         exit 1
     }
 }
-gate >/dev/null
+pass_gate
 # The temporary verification worktree is always removed.
 [[ "$(git -C "$op" worktree list --porcelain | grep -c '^worktree ')" == 1 ]] || {
     echo 'error: verification worktree left behind' >&2
@@ -118,7 +126,7 @@ FIXTURE_GH_VERIFIED=false expect_fail 'GitHub does not report v1.2.3 verified'
 git -C "$src" commit -q --allow-empty -m 'stray module tag elsewhere'
 git -C "$src" tag -fa -m 'stray' go/canon/v1.2.3 HEAD
 git -C "$src" push -q origin main refs/tags/go/canon/v1.2.3
-gate >/dev/null
+pass_gate
 [[ -z "$(git -C "$op" for-each-ref refs/tags/go/)" ]] || {
     echo 'error: the gate installed a module tag ref' >&2
     exit 1
@@ -127,7 +135,7 @@ git -C "$scratch/remote.git" update-ref -d refs/tags/go/canon/v1.2.3
 git -C "$src" tag -d go/canon/v1.2.3 >/dev/null
 git -C "$src" reset -q --hard "$commit"
 git -C "$src" push -q --force origin main
-gate >/dev/null
+pass_gate
 
 # Same commit, different (unsigned) annotated object: must fail, and the
 # verified local tags must survive the attempt untouched.
@@ -146,30 +154,43 @@ if [[ -n "$(git -C "$op" for-each-ref refs/canonprims-verify/)" ]]; then
 fi
 
 # A workflow pin failure in a correctly signed target reports that cause
-# only: never a signature failure.
-not_signature() {
-    if grep -qi 'signature' "$scratch/out"; then
-        echo 'error: a workflow pin failure was reported as a signature failure' >&2
+# and nothing else: the gate's whole output is the one expected line, so no
+# other cause (a signature or signer claim, in any wording or layout) can
+# ride along.
+# Compared byte for byte: one line, one LF.
+only_cause() {
+    printf '%s\n' "$1" >"$scratch/expected"
+    if ! cmp -s "$scratch/expected" "$scratch/out"; then
+        echo 'error: a workflow pin failure reported more than its own cause:' >&2
         cat "$scratch/out" >&2
         exit 1
     fi
 }
+# The comparison itself refuses an extra blank line, a missing final LF and
+# a NUL byte.
+for extra in 'cause\n\n' 'cause' 'cause\n\0'; do
+    printf "$extra" >"$scratch/out"
+    if (only_cause cause) 2>/dev/null; then
+        echo "error: only_cause accepted altered output: $extra" >&2
+        exit 1
+    fi
+done
 printf '# unreviewed\n' >>"$src/.github/workflows/release.yml"
 git -C "$src" commit -qam 'unreviewed workflow'
 sign_tag 'Fixture release'
 git -C "$src" push -q origin main
 git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'release.yml differs from its reviewed digest'
-not_signature
+only_cause 'error: .github/workflows/release.yml differs from its reviewed digest in config/release/release-workflow.sha256'
 git -C "$src" reset -q --hard "$commit"
 sign_tag 'Fixture release'
 git -C "$src" push -q --force origin main refs/tags/v1.2.3
-gate >/dev/null
+pass_gate
 # The same holds when the workflow pin cannot read YAML.
 (
     unset CANONPRIMS_YAMLPRIMS_BIN
     expect_fail 'CANONPRIMS_YAMLPRIMS_BIN is required'
-    not_signature
+    only_cause 'error: CANONPRIMS_YAMLPRIMS_BIN is required (absolute path to the yamlprims CLI pinned in config/yamlprims-cli.txt)'
 )
 
 # Lightweight replacement: must fail.
@@ -179,7 +200,7 @@ expect_fail 'annotated tag required'
 # Restore a valid signed tag: passes again.
 sign_tag 'Fixture release'
 git -C "$src" push -q --force origin refs/tags/v1.2.3
-gate >/dev/null
+pass_gate
 
 # The approved primary must come from the maintainer environment.
 (
@@ -213,7 +234,7 @@ export GNUPGHOME="$scratch/gpg"
 git -C "$src" reset -q --hard "$commit"
 sign_tag 'Fixture release'
 git -C "$src" push -q --force origin main refs/tags/v1.2.3
-gate >/dev/null
+pass_gate
 
 # An unverified target carrying a marker-writing fake verifier and helper must
 # never be executed: the gate runs only the operator's trusted scripts.
@@ -236,7 +257,7 @@ expect_fail 'signature is invalid under the pin'
 # Even a correctly signed target cannot run its own scripts in the gate.
 sign_tag 'Fixture release'
 git -C "$src" push -q --force origin refs/tags/v1.2.3
-gate >/dev/null
+pass_gate
 [[ ! -e "$marker" ]] || {
     echo 'error: code from the tag target was executed' >&2
     exit 1
@@ -273,7 +294,7 @@ grep -q 'differs from the verified anchor' "$scratch/out"
     echo 'error: local tag ref changed before the anchor check' >&2
     exit 1
 }
-gate >/dev/null
+pass_gate
 # Same commit, approved key, DIFFERENT tag object (new message): fails.
 git -C "$src" reset -q --hard "$anchor_commit"
 sign_tag 'Fixture release, re-signed'
