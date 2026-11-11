@@ -256,6 +256,13 @@ expect("does not produce the yamlprims plain JSON contract", resolved_with(stub(
     "drift", f'[[ "$1" == --version ]] && exec "{real}" "$@"\ncat >/dev/null\nprintf "{{\\"on\\":\\"push\\"}}\\n"')))
 expect("does not refuse a duplicate key", resolved_with(stub(
     "lenient", f'[[ "$1" == --version ]] && exec "{real}" "$@"\nin="$(cat)"\n[[ "$in" == "a: 1"* ]] && {{ echo "{{\\"a\\":2}}"; exit 0; }}\nexec "{real}" "$@" <<<"$in"')))
+# Only the version probe gets the first-run budget: resolve's contract
+# probes, which follow it, keep TIMEOUT.
+ym.TIMEOUT = 1
+for name, first in (("slowprobe", "on:"), ("slowdup", "a: 1")):
+    expect("yamlprims did not finish within 1 seconds", resolved_with(stub(
+        name, f'[[ "$1" == --version ]] && exec "{real}" "$@"\nin="$(cat)"\n[[ "$in" == "{first}"* ]] && sleep 2\nexec "{real}" "$@" <<<"$in"')))
+ym.TIMEOUT = 30
 
 # Check and use are one copy: only a private 0700 copy is run, so replacing
 # the source after it was authenticated changes nothing.

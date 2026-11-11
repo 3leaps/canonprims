@@ -154,33 +154,34 @@ if [[ -n "$(git -C "$op" for-each-ref refs/canonprims-verify/)" ]]; then
 fi
 
 # A workflow pin failure in a correctly signed target reports that cause
-# only: never a signature failure. These are the verifier's signature
-# causes (verify-pinned-tag.sh), matched exactly.
-signature_cause() {
-    grep -q -F -e 'signature is invalid under the pin' -e 'signature status:' \
-        -e 'is not signed by the committed signing subkey' "$1"
-}
-# Each cause is still spelled this way by the verifier.
-for cause in 'signature is invalid under the pin' 'signature status:' 'is not signed by the committed signing subkey'; do
-    grep -q -F "$cause" "$root/scripts/verify-pinned-tag.sh" || {
-        echo "error: verify-pinned-tag.sh no longer reports: $cause" >&2
-        exit 1
-    }
-done
-not_signature() {
-    if signature_cause "$scratch/out"; then
-        echo 'error: a workflow pin failure was reported as a signature failure' >&2
+# and nothing else: the gate's whole output is the one expected line, so no
+# other cause (a signature or signer claim, in any wording or layout) can
+# ride along.
+# Compared byte for byte: one line, one LF.
+only_cause() {
+    printf '%s\n' "$1" >"$scratch/expected"
+    if ! cmp -s "$scratch/expected" "$scratch/out"; then
+        echo 'error: a workflow pin failure reported more than its own cause:' >&2
         cat "$scratch/out" >&2
         exit 1
     fi
 }
+# The comparison itself refuses an extra blank line, a missing final LF and
+# a NUL byte.
+for extra in 'cause\n\n' 'cause' 'cause\n\0'; do
+    printf "$extra" >"$scratch/out"
+    if (only_cause cause) 2>/dev/null; then
+        echo "error: only_cause accepted altered output: $extra" >&2
+        exit 1
+    fi
+done
 printf '# unreviewed\n' >>"$src/.github/workflows/release.yml"
 git -C "$src" commit -qam 'unreviewed workflow'
 sign_tag 'Fixture release'
 git -C "$src" push -q origin main
 git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'release.yml differs from its reviewed digest'
-not_signature
+only_cause 'error: .github/workflows/release.yml differs from its reviewed digest in config/release/release-workflow.sha256'
 git -C "$src" reset -q --hard "$commit"
 sign_tag 'Fixture release'
 git -C "$src" push -q --force origin main refs/tags/v1.2.3
@@ -189,7 +190,7 @@ pass_gate
 (
     unset CANONPRIMS_YAMLPRIMS_BIN
     expect_fail 'CANONPRIMS_YAMLPRIMS_BIN is required'
-    not_signature
+    only_cause 'error: CANONPRIMS_YAMLPRIMS_BIN is required (absolute path to the yamlprims CLI pinned in config/yamlprims-cli.txt)'
 )
 
 # Lightweight replacement: must fail.
@@ -249,11 +250,6 @@ GIT_COMMITTER_NAME='3 Leaps Infosec Team' GIT_COMMITTER_EMAIL=infosec@3leaps.net
 git -C "$src" push -q origin main
 git -C "$src" push -q --force origin refs/tags/v1.2.3
 expect_fail 'signature is invalid under the pin'
-# The matcher recognises a real signature failure.
-signature_cause "$scratch/out" || {
-    echo 'error: not_signature does not recognise a signature failure' >&2
-    exit 1
-}
 [[ ! -e "$marker" ]] || {
     echo 'error: code from the unverified tag target was executed' >&2
     exit 1

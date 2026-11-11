@@ -138,6 +138,9 @@ sed_in_place 's/            cases = mutations(text)$/            cases = []/' "$
 mutation_guard 'no mutation cases'
 sed_in_place 's/        text.replace("decernor-ci-sha256.txt", "x.txt"),$/        text.replace("no-such-anchor", "x.txt"),/' "$perm"
 mutation_guard 'does not change the workflow'
+# A rule control refused for a reason other than its own fails the run.
+sed_in_place 's/    case("malformed step", /    case("not this rule", /' "$perm"
+mutation_guard 'refused by another rule'
 # The ceremony reads the tagged commit, not the working tree: an uncommitted
 # fix does not rescue a bad commit, and an uncommitted edit does not break a
 # good one.
