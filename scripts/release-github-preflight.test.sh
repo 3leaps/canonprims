@@ -76,7 +76,7 @@ JSON
   "conditions": {
     "ref_name": {
       "exclude": [],
-      "include": ["refs/tags/v*", "refs/tags/go/*/v*"]
+      "include": ["refs/tags/v*", "refs/tags/spec-v*", "refs/tags/go/*/v*"]
     }
   },
   "rules": [
@@ -206,6 +206,16 @@ expect_refused "environment publish-npm deployment policy must allow only tag pa
 write_pristine_api
 
 # Tag ruleset negative controls.
+jq '.conditions.ref_name.include = ["refs/tags/v*"]' "$scratch/api/ruleset-25798917.json" >"$scratch/api/tmp.json"
+mv "$scratch/api/tmp.json" "$scratch/api/ruleset-25798917.json"
+expect_refused "ruleset 'Tag Publish Protection' does not match"
+write_pristine_api
+
+jq '.conditions.ref_name.include = ["refs/tags/spec-v*"]' "$scratch/api/ruleset-25798917.json" >"$scratch/api/tmp.json"
+mv "$scratch/api/tmp.json" "$scratch/api/ruleset-25798917.json"
+expect_refused "ruleset 'Tag Publish Protection' does not match"
+write_pristine_api
+
 jq '.enforcement = "disabled"' "$scratch/api/ruleset-25798917.json" >"$scratch/api/tmp.json"
 mv "$scratch/api/tmp.json" "$scratch/api/ruleset-25798917.json"
 expect_refused "ruleset 'Tag Publish Protection' does not match"

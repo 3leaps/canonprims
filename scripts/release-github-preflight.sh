@@ -6,8 +6,8 @@
 #      can_admins_bypass: false) and restrict deployments to a custom tag policy
 #      of `v*` only (`protected_branches: false`, `custom_branch_policies: true`).
 #   2. The active repository `Tag Publish Protection` ruleset must protect
-#      `refs/tags/v*` against creation, update, deletion, and non_fast_forward
-#      with only OrganizationAdmin bypass.
+#      both `refs/tags/v*` and `refs/tags/spec-v*` against creation,
+#      update, deletion, and non_fast_forward with only OrganizationAdmin bypass.
 #   3. Immutable releases must be enabled on the repository via the authoritative
 #      `repos/3leaps/canonprims/immutable-releases` settings endpoint.
 #
@@ -94,7 +94,8 @@ check_tag_ruleset() {
 		.enforcement == "active" and
 		.conditions.ref_name.exclude == [] and
 		(.conditions.ref_name.include | index("refs/tags/v*") != null) and
-		all(.conditions.ref_name.include[]; . == "refs/tags/v*" or . == "refs/tags/go/*/v*") and
+		(.conditions.ref_name.include | index("refs/tags/spec-v*") != null) and
+		all(.conditions.ref_name.include[]; . == "refs/tags/v*" or . == "refs/tags/spec-v*" or . == "refs/tags/go/*/v*") and
 		(.rules | length) == 4 and
 		([.rules[].type] | sort) == ["creation", "deletion", "non_fast_forward", "update"] and
 		(
@@ -103,7 +104,7 @@ check_tag_ruleset() {
 		)
 	' >/dev/null <<<"$ruleset_json" ||
 		die "ruleset 'Tag Publish Protection' does not match the required tag protection policy"
-	echo "[ok] GitHub ruleset 'Tag Publish Protection': active on refs/tags/v*"
+	echo "[ok] GitHub ruleset 'Tag Publish Protection': active on refs/tags/v* and refs/tags/spec-v*"
 }
 
 check_immutable_releases() {
