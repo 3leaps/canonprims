@@ -19,7 +19,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   yamlprims at or above the committed minimum and pass a fixed contract
   probe. Each read has a deadline on the whole run and a cap on input and
   output, and a refusal, malformed output or a duplicate key fails closed.
-  CI downloads the pinned v0.1.1 CLI archive for each runner and checks the
+  CI downloads the pinned v0.2.1 CLI archive for each runner and checks the
   archive's and the extracted binary's SHA-256
   (`scripts/ci-install-yamlprims.sh`, `scripts/ci-extract-yamlprims.py`),
   replacing `scripts/ci-install-pyyaml.sh` and
