@@ -96,8 +96,9 @@ tag verification checks the pin in the tagged commit. To change one:
   equal to `origin/main`, `make release-github-preflight` (verifying that the
   `publish-pypi` and `publish-npm` GitHub Environments require maintainer review
   and allow only `v*` tags, the `Tag Publish Protection` ruleset is active on
-  `refs/tags/v*`, and `immutable_releases` is enabled), the release source inert
-  for Cargo (checked before anything compiles), `make check`,
+  `refs/tags/v*` and `refs/tags/spec-v*`, and `immutable_releases` is enabled),
+  the release source inert for Cargo (checked before anything compiles),
+  `make check`,
   `make release-tooling-test`, `make release-check`, notes and changelog present.
 - [ ] Main CI is green on this exact commit. Preflight alone is not enough.
 
