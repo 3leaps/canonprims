@@ -15,6 +15,9 @@ mkdir -p "$scratch/py" "$scratch/stubs"
 ln -s "$python" "$scratch/py/python3"
 config="$root/.goneat/tools.yaml"
 patterns="$root/config/doctor-versions.txt"
+# The pinned yamlprims release: the version the real binary must report.
+released_yamlprims="$(awk '$1 == "release" { print $2 }' "$root/config/yamlprims-cli.txt")"
+[[ "$released_yamlprims" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'error: no pinned yamlprims release' >&2; exit 1; }
 
 # Version output in each tool's own format, at or above its declared minimum.
 # (Plain functions, not associative arrays: macOS ships bash 3.2.)
@@ -96,7 +99,7 @@ passes release
 passes dev
 # Each tool's version format is parsed to the right number.
 doctor release
-for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11' 'npm 11.19.0' 'uv 0.8.22' 'yamlprims 0.1.0'; do
+for line in 'git 2.54.0' 'gh 2.94.0' 'jq 1.7.1' 'gpg 2.2.0' 'minisign 0.11' 'npm 11.19.0' 'uv 0.8.22' "yamlprims $released_yamlprims"; do
 	grep -q "^\[ok\] $line (minimum" "$scratch/out" || { echo "error: did not read '$line'" >&2; cat "$scratch/out" >&2; exit 1; }
 done
 doctor dev
@@ -120,12 +123,12 @@ grep -q 'old-python --version' "$scratch/oldpy.yaml"
 if direct "$scratch/oldpy.yaml" dev; then echo 'error: accepted Python 3.10' >&2; exit 1; fi
 grep -q 'python3 3.10.14 is below the recommended minimum 3.11.0' "$scratch/out"
 
-# The released yamlprims reads as 0.1.0 (it has no version flag: usage on
-# stderr, status 2). Any other binary, even one printing a good version line,
-# and an unset or relative variable, are unreadable.
+# The pinned yamlprims release reads as its own version. Any other binary,
+# even one printing a good version line, and an unset or relative variable,
+# are unreadable.
 reset_stubs
 passes dev
-grep -q '^\[ok\] yamlprims 0.1.0 (minimum' "$scratch/out"
+grep -q "^\[ok\] yamlprims $released_yamlprims (minimum" "$scratch/out"
 stub yamlprims-stub 'yamlprims 0.1.0'
 yamlprims_bin="$scratch/stubs/yamlprims-stub" refused dev 'yamlprims: cannot read a version'
 yamlprims_bin='' refused dev 'yamlprims: cannot read a version'
