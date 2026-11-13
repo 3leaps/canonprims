@@ -12,20 +12,20 @@ minimum 0.1.0
 # per runner archive, "<sha256>  <archive>", each digest as listed in that
 # release's SHA256SUMS (signed with the 3 Leaps release minisign key,
 # docs/security/canonprims-minisign.pub).
-# https://github.com/3leaps/yamlprims/releases/tag/v0.1.1
-release 0.1.1
-738950ddfbeac5dcfbdbf03261c4af33c4e479c2ef9974d27968caf77cf2b7db  yamlprims-0.1.1-darwin-arm64.tar.gz
-232e7393062bf2d9e97d47da6d70baa410442fc92dbd1bcf6e6e3710e500fe2e  yamlprims-0.1.1-linux-amd64.tar.gz
-474fa50c2e01877900cb3edec6532dacd0e6f65cbd40c52d7f5faf3900535f9a  yamlprims-0.1.1-linux-arm64.tar.gz
-e9ef826339c9a972b2e77347eb310a3fcb7e243a9084ab56a77231e42605dde2  yamlprims-0.1.1-windows-amd64.zip
-e9b8b225783d59def617206ba926bf3097cb35456278f450e1046446d73c6ee6  yamlprims-0.1.1-windows-arm64.zip
+# https://github.com/3leaps/yamlprims/releases/tag/v0.2.1
+release 0.2.1
+430a80ae6b267b3d5066e32b7f1c0aa2509192dceceb4094b63f09b24a6e2cf4  yamlprims-0.2.1-darwin-arm64.tar.gz
+08decf02549acf6b0e15c56848d6030aedf8ccfabe6ec6ead8a6ef8ee45644a2  yamlprims-0.2.1-linux-amd64.tar.gz
+b4ccbcd42d97aff497c3759555a079e97d7ae39415591d256b33fd404a30f5b2  yamlprims-0.2.1-linux-arm64.tar.gz
+0da9b43a6b46854efd6e166373e18fb31ed0446c4bee0c5b4f850302d3fdd11f  yamlprims-0.2.1-windows-amd64.zip
+0146913d879d1bad4aa9dfb78be63dbcef04d399be8d7d1534c594485139c105  yamlprims-0.2.1-windows-arm64.zip
 #
 # The trust anchor for the binary itself: the SHA-256 of the executable in
 # each archive above (yamlprims, or yamlprims.exe in the zips). The checkers
 # copy the file named by CANONPRIMS_YAMLPRIMS_BIN and run the copy only if its
 # digest is listed here for a platform the host runs.
-binary darwin-arm64 c891810f36a164868559a0d60ded73cafea29f52c500247574baab15d8586d43
-binary linux-amd64 14e20b99c9fff5739895822c6ac0c42ac8e2f6b84d99146c87ae9a170b110d03
-binary linux-arm64 35100750c040b2c3dee913867a41fe4e1963c4e8dacd0a14d9785390cf2ae4c1
-binary windows-amd64 56e8c963802ab849fa26f559f7f8e675d98d910a7fade587285043709f0338b7
-binary windows-arm64 468b2c3a882fbd7a8b4e79fc7a46b3522e0312ddbde7e2832782a6b89ae95b11
+binary darwin-arm64 c002c7871d785d4eca4f60b77c9ab0100a207fecb69721ae672676b709ab302f
+binary linux-amd64 fb14302dc442f26d4adaa09c93eb4d0cff514e1476850ff563daa44aeb63124a
+binary linux-arm64 5ed9769692761fa142c713551d818f5d5993e235b098aa30d9f18b070933af5f
+binary windows-amd64 be3170b1deb898105902e7f8ea3b41906572ff14d1a9ed3a36a6ae98d508cc8f
+binary windows-arm64 ef5ccbe47c892e3cd7e326a1c9a0f844101dbd75fda792e44d6f1b7e03aa15ca
